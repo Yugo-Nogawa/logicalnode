@@ -1,0 +1,51 @@
+{
+  "name": "logical-node-3",
+  "version": "1.0.0",
+  "description": "Logical Node 3 - A simple and focused logic tree tool",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "keywords": [
+    "logical-node",
+    "logic-tree",
+    "mindmap",
+    "思考ツール"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.0",
+    "electron-packager": "^17.1.2",
+    "icon-gen": "^5.0.0",
+    "sharp": "^0.34.4"
+  },
+  "build": {
+    "appId": "com.logicalnode3.app",
+    "productName": "Logical Node 3",
+    "files": [
+      "**/*",
+      "!node_modules/**/*",
+      "!generate-icon.js"
+    ],
+    "directories": {
+      "buildResources": "assets"
+    },
+    "win": {
+      "target": "zip",
+      "icon": "assets/icons/icon.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icons/icon.png",
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icons/icon.png",
+      "category": "Utility"
+    }
+  }
+}
