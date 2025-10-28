@@ -4,6 +4,23 @@ const fs = require('fs').promises;
 
 let mainWindow;
 let fileToOpen = null;
+let currentFilePath = null; // 現在開いているファイルのパス
+let recentFiles = []; // 最近開いたファイルのリスト
+const MAX_RECENT_FILES = 10;
+
+// 最近開いたファイルに追加
+function addToRecentFiles(filePath) {
+  // 既存のエントリを削除
+  recentFiles = recentFiles.filter(f => f !== filePath);
+  // 先頭に追加
+  recentFiles.unshift(filePath);
+  // 最大数を超えたら削除
+  if (recentFiles.length > MAX_RECENT_FILES) {
+    recentFiles = recentFiles.slice(0, MAX_RECENT_FILES);
+  }
+  // Electronの最近使ったファイルに追加
+  app.addRecentDocument(filePath);
+}
 
 function createWindow(filePath = null) {
   const newWindow = new BrowserWindow({
@@ -26,6 +43,8 @@ function createWindow(filePath = null) {
     if (fileToLoad) {
       try {
         const data = await fs.readFile(fileToLoad, 'utf8');
+        currentFilePath = fileToLoad; // ファイルパスを記憶
+        addToRecentFiles(fileToLoad); // 最近開いたファイルに追加
         newWindow.webContents.send('load-file', data);
         if (!filePath) {
           fileToOpen = null;
@@ -105,6 +124,8 @@ function createWindow(filePath = null) {
             if (!result.canceled && result.filePaths.length > 0) {
               try {
                 const data = await fs.readFile(result.filePaths[0], 'utf8');
+                currentFilePath = result.filePaths[0]; // ファイルパスを記憶
+                addToRecentFiles(result.filePaths[0]); // 最近開いたファイルに追加
                 mainWindow.webContents.send('load-file', data);
               } catch (err) {
                 dialog.showErrorBox('Error', 'Failed to open file: ' + err.message);
@@ -121,6 +142,49 @@ function createWindow(filePath = null) {
               focusedWindow.webContents.send('save-file');
             }
           }
+        },
+        {
+          label: 'Save As...',
+          accelerator: 'CmdOrCtrl+Shift+S',
+          click: () => {
+            const focusedWindow = BrowserWindow.getFocusedWindow();
+            if (focusedWindow) {
+              focusedWindow.webContents.send('save-file-as');
+            }
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Export',
+          submenu: [
+            {
+              label: 'Export as Markdown...',
+              click: () => {
+                const focusedWindow = BrowserWindow.getFocusedWindow();
+                if (focusedWindow) {
+                  focusedWindow.webContents.send('export-markdown');
+                }
+              }
+            },
+            {
+              label: 'Export as Text...',
+              click: () => {
+                const focusedWindow = BrowserWindow.getFocusedWindow();
+                if (focusedWindow) {
+                  focusedWindow.webContents.send('export-text');
+                }
+              }
+            },
+            {
+              label: 'Export as PNG...',
+              click: () => {
+                const focusedWindow = BrowserWindow.getFocusedWindow();
+                if (focusedWindow) {
+                  focusedWindow.webContents.send('export-png');
+                }
+              }
+            }
+          ]
         },
         { type: 'separator' },
         {
@@ -182,20 +246,117 @@ ipcMain.handle('open-file-in-new-window', async (event, filePath) => {
   }
 });
 
-// ファイル保存の処理
-ipcMain.handle('save-file-dialog', async (event, data) => {
+// ウィンドウタイトルを更新
+ipcMain.handle('update-window-title', async (event, hasUnsavedChanges) => {
+  if (mainWindow) {
+    const fileName = currentFilePath ? path.basename(currentFilePath) : 'Untitled';
+    const unsavedMark = hasUnsavedChanges ? '* ' : '';
+    mainWindow.setTitle(`${unsavedMark}${fileName} - Logic Tree`);
+  }
+});
+
+// 上書き保存の処理
+ipcMain.handle('save-file', async (event, data) => {
+  // 現在のファイルパスがある場合は上書き保存
+  if (currentFilePath) {
+    try {
+      await fs.writeFile(currentFilePath, data, 'utf8');
+      return { success: true, filePath: currentFilePath };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  // ファイルパスがない場合は別名保存と同じ動作
+  return await saveFileAs(data);
+});
+
+// 別名保存の処理
+ipcMain.handle('save-file-as', async (event, data) => {
+  return await saveFileAs(data);
+});
+
+// 別名保存のヘルパー関数
+async function saveFileAs(data) {
   const result = await dialog.showSaveDialog(mainWindow, {
     filters: [
       { name: 'Logic Tree Files', extensions: ['tree'] },
       { name: 'JSON Files', extensions: ['json'] },
       { name: 'All Files', extensions: ['*'] }
     ],
-    defaultPath: 'logic-tree.tree'
+    defaultPath: currentFilePath || 'logic-tree.tree'
   });
 
   if (!result.canceled && result.filePath) {
     try {
       await fs.writeFile(result.filePath, data, 'utf8');
+      currentFilePath = result.filePath; // ファイルパスを更新
+      return { success: true, filePath: result.filePath };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+  return { success: false, canceled: true };
+}
+
+// Markdownエクスポート
+ipcMain.handle('export-markdown', async (event, data) => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    filters: [
+      { name: 'Markdown Files', extensions: ['md'] },
+      { name: 'All Files', extensions: ['*'] }
+    ],
+    defaultPath: 'logic-tree.md'
+  });
+
+  if (!result.canceled && result.filePath) {
+    try {
+      await fs.writeFile(result.filePath, data, 'utf8');
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+  return { success: false, canceled: true };
+});
+
+// テキストエクスポート
+ipcMain.handle('export-text', async (event, data) => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    filters: [
+      { name: 'Text Files', extensions: ['txt'] },
+      { name: 'All Files', extensions: ['*'] }
+    ],
+    defaultPath: 'logic-tree.txt'
+  });
+
+  if (!result.canceled && result.filePath) {
+    try {
+      await fs.writeFile(result.filePath, data, 'utf8');
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+  return { success: false, canceled: true };
+});
+
+// PNG画像エクスポート
+ipcMain.handle('export-png', async (event, dataURL) => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    filters: [
+      { name: 'PNG Images', extensions: ['png'] },
+      { name: 'All Files', extensions: ['*'] }
+    ],
+    defaultPath: 'logic-tree.png'
+  });
+
+  if (!result.canceled && result.filePath) {
+    try {
+      // Data URLからBase64部分を抽出
+      const base64Data = dataURL.replace(/^data:image\/png;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+      await fs.writeFile(result.filePath, buffer);
       return { success: true };
     } catch (err) {
       return { success: false, error: err.message };
@@ -222,6 +383,7 @@ app.on('open-file', (event, filePath) => {
   if (mainWindow && mainWindow.webContents) {
     fs.readFile(filePath, 'utf8')
       .then(data => {
+        currentFilePath = filePath; // ファイルパスを記憶
         mainWindow.webContents.send('load-file', data);
       })
       .catch(err => {
