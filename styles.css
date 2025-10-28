@@ -102,6 +102,91 @@ body {
   display: none; /* サイドバーを非表示 */
 }
 
+/* パンくずリスト */
+#breadcrumb {
+  padding: 8px 16px;
+  background-color: #fafafa;
+  border-bottom: 1px solid #e0e0e0;
+  font-size: 12px;
+  color: #666;
+  min-height: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+#breadcrumb .breadcrumb-item {
+  color: #666;
+  flex-shrink: 0;
+}
+
+#breadcrumb .breadcrumb-separator {
+  color: #bbb;
+  flex-shrink: 0;
+}
+
+#breadcrumb .breadcrumb-item:last-child {
+  color: #333;
+  font-weight: 500;
+}
+
+/* 検索バー */
+#search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: #fffacd;
+  border-bottom: 1px solid #e0e0e0;
+  font-size: 14px;
+}
+
+#search-input {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid #d0d0d0;
+  border-radius: 3px;
+  font-size: 14px;
+  outline: none;
+}
+
+#search-input:focus {
+  border-color: #4299e1;
+  box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.15);
+}
+
+#search-results {
+  font-size: 12px;
+  color: #666;
+  white-space: nowrap;
+}
+
+.search-nav-btn {
+  padding: 4px 8px;
+  background-color: #fff;
+  border: 1px solid #d0d0d0;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.15s;
+  min-width: 28px;
+  height: 28px;
+}
+
+.search-nav-btn:hover {
+  background-color: #f0f0f0;
+  border-color: #b0b0b0;
+}
+
+.search-nav-btn:active {
+  background-color: #e0e0e0;
+}
+
 #main-content {
   flex: 1;
   overflow: auto;
@@ -240,9 +325,16 @@ body {
 
 /* フォーカス時のスタイル（選択モード時のみ） */
 .tree-node.focused > .node-wrapper > .node-content > .node-input[readonly] {
-  background-color: #fff;
+  background-color: #e0f2fe;
   border-color: #4299e1;
   box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.15);
+}
+
+/* 複数選択時のスタイル */
+.tree-node.selected > .node-wrapper > .node-content > .node-input[readonly] {
+  background-color: #bfdbfe;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
 /* スクロールバーのスタイリング */

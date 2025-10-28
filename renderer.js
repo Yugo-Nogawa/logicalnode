@@ -9,6 +9,7 @@ let treeData = {
 
 let focusedNodeId = null;
 let nodeIdCounter = 1;
+let selectedNodeIds = []; // 複数選択されたノードのIDリスト
 
 // Undo/Redo用の履歴管理
 let history = [];
@@ -59,6 +60,8 @@ function checkUnsavedChanges() {
     const savedData = JSON.stringify(savedTreeData);
     window.hasUnsavedChanges = currentData !== savedData;
   }
+  // ウィンドウタイトルを更新
+  ipcRenderer.invoke('update-window-title', window.hasUnsavedChanges);
 }
 
 // Undo
@@ -131,6 +134,79 @@ function findParentNode(node, targetId, parent = null) {
     const found = findParentNode(child, targetId, node);
     if (found) return found;
   }
+  return null;
+}
+
+// ノードの階層レベルを取得（ルートの子が1、その子が2...）
+function getNodeLevel(nodeId) {
+  let level = 0;
+  let current = findNode(treeData, nodeId);
+
+  while (current) {
+    const parent = findParentNode(treeData, current.id);
+    if (!parent || parent.id === 'root') {
+      break;
+    }
+    level++;
+    current = parent;
+  }
+
+  return level + 1; // ルートの子をレベル1とする
+}
+
+// すべてのノードを表示順序で取得（レベル情報付き）
+function getAllNodesWithLevel(node = treeData, result = []) {
+  if (node.id !== 'root') {
+    const level = getNodeLevel(node.id);
+    result.push({ node, level });
+  }
+
+  if (!node.collapsed && node.children) {
+    node.children.forEach(child => getAllNodesWithLevel(child, result));
+  }
+
+  return result;
+}
+
+// 下矢印でのナビゲーション先を取得（同じ階層レベルで次のノード）
+function getNextNavigableNode(nodeId) {
+  const currentNode = findNode(treeData, nodeId);
+  if (!currentNode) return null;
+
+  const currentLevel = getNodeLevel(nodeId);
+  const allNodes = getAllNodesWithLevel();
+
+  // 現在のノードのインデックスを探す
+  const currentIndex = allNodes.findIndex(item => item.node.id === nodeId);
+
+  // 現在のノードより後ろで、同じレベルのノードを探す
+  for (let i = currentIndex + 1; i < allNodes.length; i++) {
+    if (allNodes[i].level === currentLevel) {
+      return allNodes[i].node;
+    }
+  }
+
+  return null;
+}
+
+// 上矢印でのナビゲーション先を取得（同じ階層レベルで前のノード）
+function getPrevNavigableNode(nodeId) {
+  const currentNode = findNode(treeData, nodeId);
+  if (!currentNode) return null;
+
+  const currentLevel = getNodeLevel(nodeId);
+  const allNodes = getAllNodesWithLevel();
+
+  // 現在のノードのインデックスを探す
+  const currentIndex = allNodes.findIndex(item => item.node.id === nodeId);
+
+  // 現在のノードより前で、同じレベルのノードを探す（逆順）
+  for (let i = currentIndex - 1; i >= 0; i--) {
+    if (allNodes[i].level === currentLevel) {
+      return allNodes[i].node;
+    }
+  }
+
   return null;
 }
 
@@ -309,6 +385,9 @@ function renderTree(shouldEnterEditMode = false) {
     drawConnections();
   }, 0);
 
+  // フォーカス状態を更新（パンくずリストも更新される）
+  updateFocusedNode();
+
   // 編集モードに入る場合のみフォーカス
   if (focusedNodeId && shouldEnterEditMode) {
     setTimeout(() => {
@@ -457,6 +536,7 @@ function renderNode(node) {
   input.addEventListener('input', (e) => {
     node.text = e.target.value;
     autoResize(); // テキスト変更時にリサイズ
+    updateBreadcrumb(); // パンくずリストを更新
 
     // デバウンス処理: 入力が止まってから500ms後に履歴を保存
     if (inputTimeout) {
@@ -636,6 +716,7 @@ function renderNode(node) {
 function updateFocusedNode() {
   document.querySelectorAll('.tree-node').forEach(el => {
     el.classList.remove('focused');
+    el.classList.remove('selected');
   });
 
   if (focusedNodeId) {
@@ -644,11 +725,67 @@ function updateFocusedNode() {
       focusedElement.classList.add('focused');
     }
   }
+
+  // 複数選択されたノードにスタイルを適用
+  selectedNodeIds.forEach(nodeId => {
+    const element = document.querySelector(`[data-node-id="${nodeId}"]`);
+    if (element && nodeId !== focusedNodeId) {
+      element.classList.add('selected');
+    }
+  });
+
+  // パンくずリストを更新
+  updateBreadcrumb();
+}
+
+// パンくずリストを更新
+function updateBreadcrumb() {
+  const breadcrumb = document.getElementById('breadcrumb');
+  if (!breadcrumb) return;
+
+  if (!focusedNodeId) {
+    breadcrumb.innerHTML = '';
+    return;
+  }
+
+  // 現在のノードから親を辿ってパスを取得
+  const path = [];
+  let currentId = focusedNodeId;
+
+  while (currentId) {
+    const node = findNode(treeData, currentId);
+    if (node) {
+      path.unshift(node);
+      const parent = findParentNode(treeData, currentId);
+      currentId = parent && parent.id !== 'root' ? parent.id : null;
+    } else {
+      break;
+    }
+  }
+
+  // パンくずリストを構築
+  breadcrumb.innerHTML = '';
+  path.forEach((node, index) => {
+    const item = document.createElement('span');
+    item.className = 'breadcrumb-item';
+    // テキストを30文字に制限
+    const text = node.text || '(空)';
+    item.textContent = text.length > 30 ? text.substring(0, 30) + '...' : text;
+    item.title = text; // ホバーで全文表示
+    breadcrumb.appendChild(item);
+
+    if (index < path.length - 1) {
+      const separator = document.createElement('span');
+      separator.className = 'breadcrumb-separator';
+      separator.textContent = '›';
+      breadcrumb.appendChild(separator);
+    }
+  });
 }
 
 // キーボード操作の処理（編集モード内）
 function handleKeyPress(e, node) {
-  // Enter: 兄弟ノードを追加
+  // Enter: 兄弟ノードを追加（Shift+Enterで上に、Enterで下に）
   if (e.key === 'Enter') {
     // キーリピートを無視
     if (e.repeat) {
@@ -663,9 +800,11 @@ function handleKeyPress(e, node) {
       const siblings = parent.children;
       const index = siblings.findIndex(n => n.id === node.id);
       const newNode = createNode('');
-      siblings.splice(index + 1, 0, newNode);
+      // Shift+Enterで上に、Enterで下に挿入
+      const insertIndex = e.shiftKey ? index : index + 1;
+      siblings.splice(insertIndex, 0, newNode);
       focusedNodeId = newNode.id;
-      renderTree(true); // 自動フォーカス有効
+      renderTree(false); // 選択モードで作成
     }
   }
 
@@ -692,16 +831,33 @@ function handleKeyPress(e, node) {
   }
 }
 
-// ファイル保存
+// ファイル保存（上書き保存）
 async function saveFile() {
   const data = JSON.stringify(treeData, null, 2);
-  const result = await ipcRenderer.invoke('save-file-dialog', data);
+  const result = await ipcRenderer.invoke('save-file', data);
 
   if (result.success) {
     console.log('File saved successfully');
     // 保存済みデータを更新
     savedTreeData = JSON.parse(JSON.stringify(treeData));
     window.hasUnsavedChanges = false;
+    ipcRenderer.invoke('update-window-title', false);
+  } else if (!result.canceled) {
+    console.error('Failed to save file:', result.error);
+  }
+}
+
+// ファイル別名保存
+async function saveFileAs() {
+  const data = JSON.stringify(treeData, null, 2);
+  const result = await ipcRenderer.invoke('save-file-as', data);
+
+  if (result.success) {
+    console.log('File saved as successfully');
+    // 保存済みデータを更新
+    savedTreeData = JSON.parse(JSON.stringify(treeData));
+    window.hasUnsavedChanges = false;
+    ipcRenderer.invoke('update-window-title', false);
   } else if (!result.canceled) {
     console.error('Failed to save file:', result.error);
   }
@@ -729,6 +885,7 @@ function loadFile(data) {
     // 読み込んだデータを保存済みとしてマーク
     savedTreeData = JSON.parse(JSON.stringify(treeData));
     window.hasUnsavedChanges = false;
+    ipcRenderer.invoke('update-window-title', false);
 
     renderTree();
   } catch (err) {
@@ -766,56 +923,192 @@ document.addEventListener('keydown', (e) => {
     return;
   }
 
-  // ArrowUp: 前の兄弟へ移動 or Ctrl+ArrowUp: ノードを上に移動
+  // ArrowUp: 前のノードへ移動 or Ctrl+ArrowUp: ノードを上に移動
   if (e.key === 'ArrowUp') {
     e.preventDefault();
-    const parent = findParentNode(treeData, focusedNode.id);
-    if (parent) {
-      const siblings = parent.children;
-      const index = siblings.findIndex(n => n.id === focusedNode.id);
 
-      if (e.ctrlKey || e.metaKey) {
-        // Ctrl/Cmd + ArrowUp: ノードを上に移動
-        if (index > 0) {
-          saveHistory();
-          [siblings[index - 1], siblings[index]] = [siblings[index], siblings[index - 1]];
-          renderTree();
-          updateToolbar();
+    if (e.ctrlKey || e.metaKey) {
+      // Ctrl/Cmd + ArrowUp: 同じ階層レベルで上のノードの位置に移動
+      // 複数選択時は全て移動
+      const nodesToMove = selectedNodeIds.length > 0 ?
+        selectedNodeIds.map(id => findNode(treeData, id)).filter(n => n) :
+        [focusedNode];
+
+      const prevNode = getPrevNavigableNode(focusedNode.id);
+
+      if (!prevNode) {
+        return;
+      }
+
+      const isTargetSelected = nodesToMove.find(n => n.id === prevNode.id);
+      if (isTargetSelected) {
+        return;
+      }
+
+      saveHistory();
+
+      // 移動先の親を先に取得
+      const targetParent = findParentNode(treeData, prevNode.id);
+      if (!targetParent) {
+        return;
+      }
+
+      const targetIndex = targetParent.children.findIndex(n => n.id === prevNode.id);
+      if (targetIndex === -1) {
+        return;
+      }
+
+      // 移動するノードを親ごとにグループ化
+      const nodesByParent = new Map();
+      nodesToMove.forEach(node => {
+        const parent = findParentNode(treeData, node.id);
+        if (parent) {
+          if (!nodesByParent.has(parent.id)) {
+            nodesByParent.set(parent.id, []);
+          }
+          nodesByParent.get(parent.id).push(node);
         }
-      } else {
-        // ArrowUp: 前の兄弟へナビゲート
-        if (index > 0) {
-          focusedNodeId = siblings[index - 1].id;
-          renderTree();
-          updateToolbar();
+      });
+
+      // 各親から削除（インデックスの大きい順に）
+      nodesByParent.forEach((nodes, parentId) => {
+        const parent = findNode(treeData, parentId);
+        if (parent) {
+          const nodesWithIndex = nodes.map(node => ({
+            node: node,
+            index: parent.children.findIndex(n => n.id === node.id)
+          })).sort((a, b) => b.index - a.index);
+
+          nodesWithIndex.forEach(({ node, index }) => {
+            if (index !== -1) {
+              parent.children.splice(index, 1);
+            }
+          });
         }
+      });
+
+      // 移動先の親に一括挿入
+      targetParent.children.splice(targetIndex, 0, ...nodesToMove);
+
+      renderTree();
+      updateToolbar();
+    } else if (e.shiftKey) {
+      // Shift + ArrowUp: 範囲選択を拡張
+      const prevNode = getPrevNavigableNode(focusedNode.id);
+      if (prevNode) {
+        if (!selectedNodeIds.includes(focusedNode.id)) {
+          selectedNodeIds.push(focusedNode.id);
+        }
+        focusedNodeId = prevNode.id;
+        if (!selectedNodeIds.includes(prevNode.id)) {
+          selectedNodeIds.push(prevNode.id);
+        }
+        renderTree();
+        updateToolbar();
+      }
+    } else {
+      // ArrowUp: 前のノードへナビゲート（選択解除）
+      selectedNodeIds = [];
+      const prevNode = getPrevNavigableNode(focusedNode.id);
+      if (prevNode) {
+        focusedNodeId = prevNode.id;
+        renderTree();
+        updateToolbar();
       }
     }
   }
 
-  // ArrowDown: 次の兄弟へ移動 or Ctrl+ArrowDown: ノードを下に移動
+  // ArrowDown: 次のノードへ移動 or Ctrl+ArrowDown: ノードを下に移動
   else if (e.key === 'ArrowDown') {
     e.preventDefault();
-    const parent = findParentNode(treeData, focusedNode.id);
-    if (parent) {
-      const siblings = parent.children;
-      const index = siblings.findIndex(n => n.id === focusedNode.id);
 
-      if (e.ctrlKey || e.metaKey) {
-        // Ctrl/Cmd + ArrowDown: ノードを下に移動
-        if (index < siblings.length - 1) {
-          saveHistory();
-          [siblings[index], siblings[index + 1]] = [siblings[index + 1], siblings[index]];
-          renderTree();
-          updateToolbar();
+    if (e.ctrlKey || e.metaKey) {
+      // Ctrl/Cmd + ArrowDown: 同じ階層レベルで下のノードの位置に移動
+      // 複数選択時は全て移動
+      const nodesToMove = selectedNodeIds.length > 0 ?
+        selectedNodeIds.map(id => findNode(treeData, id)).filter(n => n) :
+        [focusedNode];
+
+      const nextNode = getNextNavigableNode(focusedNode.id);
+
+      if (!nextNode) {
+        return;
+      }
+
+      const isTargetSelected = nodesToMove.find(n => n.id === nextNode.id);
+      if (isTargetSelected) {
+        return;
+      }
+
+      saveHistory();
+
+      // 移動先の親を先に取得
+      const targetParent = findParentNode(treeData, nextNode.id);
+      if (!targetParent) {
+        return;
+      }
+
+      const targetIndex = targetParent.children.findIndex(n => n.id === nextNode.id);
+      if (targetIndex === -1) {
+        return;
+      }
+
+      // 移動するノードを親ごとにグループ化
+      const nodesByParent = new Map();
+      nodesToMove.forEach(node => {
+        const parent = findParentNode(treeData, node.id);
+        if (parent) {
+          if (!nodesByParent.has(parent.id)) {
+            nodesByParent.set(parent.id, []);
+          }
+          nodesByParent.get(parent.id).push(node);
         }
-      } else {
-        // ArrowDown: 次の兄弟へナビゲート
-        if (index < siblings.length - 1) {
-          focusedNodeId = siblings[index + 1].id;
-          renderTree();
-          updateToolbar();
+      });
+
+      // 各親から削除（インデックスの大きい順に）
+      nodesByParent.forEach((nodes, parentId) => {
+        const parent = findNode(treeData, parentId);
+        if (parent) {
+          const nodesWithIndex = nodes.map(node => ({
+            node: node,
+            index: parent.children.findIndex(n => n.id === node.id)
+          })).sort((a, b) => b.index - a.index);
+
+          nodesWithIndex.forEach(({ node, index }) => {
+            if (index !== -1) {
+              parent.children.splice(index, 1);
+            }
+          });
         }
+      });
+
+      // 移動先の親に挿入（次のノードの後ろに）
+      targetParent.children.splice(targetIndex + 1, 0, ...nodesToMove);
+
+      renderTree();
+      updateToolbar();
+    } else if (e.shiftKey) {
+      // Shift + ArrowDown: 範囲選択を拡張
+      const nextNode = getNextNavigableNode(focusedNode.id);
+      if (nextNode) {
+        if (!selectedNodeIds.includes(focusedNode.id)) {
+          selectedNodeIds.push(focusedNode.id);
+        }
+        focusedNodeId = nextNode.id;
+        if (!selectedNodeIds.includes(nextNode.id)) {
+          selectedNodeIds.push(nextNode.id);
+        }
+        renderTree();
+        updateToolbar();
+      }
+    } else {
+      // ArrowDown: 次のノードへナビゲート（選択解除）
+      selectedNodeIds = [];
+      const nextNode = getNextNavigableNode(focusedNode.id);
+      if (nextNode) {
+        focusedNodeId = nextNode.id;
+        renderTree();
+        updateToolbar();
       }
     }
   }
@@ -826,15 +1119,61 @@ document.addEventListener('keydown', (e) => {
 
     if (e.ctrlKey || e.metaKey) {
       // Ctrl/Cmd + ArrowRight: ノードを右に移動（前の兄弟の子にする）
+      // 複数選択時は全て移動
+      const nodesToMove = selectedNodeIds.length > 0 ?
+        selectedNodeIds.map(id => findNode(treeData, id)).filter(n => n) :
+        [focusedNode];
+
+      // 最初のノードの親と位置を取得
       const parent = findParentNode(treeData, focusedNode.id);
+
       if (parent) {
         const siblings = parent.children;
         const index = siblings.findIndex(n => n.id === focusedNode.id);
+
         if (index > 0) {
-          saveHistory();
+          // 前の兄弟が選択されていないか確認
           const prevSibling = siblings[index - 1];
-          siblings.splice(index, 1);
-          prevSibling.children.push(focusedNode);
+          const isPrevSiblingSelected = nodesToMove.find(n => n.id === prevSibling.id);
+
+          if (isPrevSiblingSelected) {
+            return;
+          }
+
+          saveHistory();
+
+          // 移動するノードを親ごとにグループ化
+          const nodesByParent = new Map();
+          nodesToMove.forEach(node => {
+            const p = findParentNode(treeData, node.id);
+            if (p) {
+              if (!nodesByParent.has(p.id)) {
+                nodesByParent.set(p.id, []);
+              }
+              nodesByParent.get(p.id).push(node);
+            }
+          });
+
+          // 各親から削除（インデックスの大きい順に）
+          nodesByParent.forEach((nodes, parentId) => {
+            const p = findNode(treeData, parentId);
+            if (p) {
+              const nodesWithIndex = nodes.map(node => ({
+                node: node,
+                index: p.children.findIndex(n => n.id === node.id)
+              })).sort((a, b) => b.index - a.index);
+
+              nodesWithIndex.forEach(({ node, index }) => {
+                if (index !== -1) {
+                  p.children.splice(index, 1);
+                }
+              });
+            }
+          });
+
+          // 前の兄弟の子として追加
+          prevSibling.children.push(...nodesToMove);
+
           renderTree();
           updateToolbar();
         }
@@ -855,17 +1194,57 @@ document.addEventListener('keydown', (e) => {
 
     if (e.ctrlKey || e.metaKey) {
       // Ctrl/Cmd + ArrowLeft: ノードを左に移動（親の兄弟にする）
+      // 複数選択時は全て移動
+      const nodesToMove = selectedNodeIds.length > 0 ?
+        selectedNodeIds.map(id => findNode(treeData, id)).filter(n => n) :
+        [focusedNode];
+
       const parent = findParentNode(treeData, focusedNode.id);
       if (parent && parent.id !== 'root') {
         const grandParent = findParentNode(treeData, parent.id);
         if (grandParent) {
-          saveHistory();
-          const siblings = parent.children;
-          const index = siblings.findIndex(n => n.id === focusedNode.id);
-          siblings.splice(index, 1);
+          // 親ノード自体が選択されていないか確認
+          const isParentSelected = nodesToMove.find(n => n.id === parent.id);
+          if (isParentSelected) {
+            return;
+          }
 
+          saveHistory();
+
+          // 移動先の位置を先に取得
           const parentIndex = grandParent.children.findIndex(n => n.id === parent.id);
-          grandParent.children.splice(parentIndex + 1, 0, focusedNode);
+
+          // 移動するノードを親ごとにグループ化
+          const nodesByParent = new Map();
+          nodesToMove.forEach(node => {
+            const p = findParentNode(treeData, node.id);
+            if (p) {
+              if (!nodesByParent.has(p.id)) {
+                nodesByParent.set(p.id, []);
+              }
+              nodesByParent.get(p.id).push(node);
+            }
+          });
+
+          // 各親から削除（インデックスの大きい順に）
+          nodesByParent.forEach((nodes, parentId) => {
+            const p = findNode(treeData, parentId);
+            if (p) {
+              const nodesWithIndex = nodes.map(node => ({
+                node: node,
+                index: p.children.findIndex(n => n.id === node.id)
+              })).sort((a, b) => b.index - a.index);
+
+              nodesWithIndex.forEach(({ node, index }) => {
+                if (index !== -1) {
+                  p.children.splice(index, 1);
+                }
+              });
+            }
+          });
+
+          // 祖父ノードの子として追加（親の後ろに）
+          grandParent.children.splice(parentIndex + 1, 0, ...nodesToMove);
           renderTree();
           updateToolbar();
         }
@@ -878,6 +1257,16 @@ document.addEventListener('keydown', (e) => {
         renderTree();
         updateToolbar();
       }
+    }
+  }
+
+  // Escape: 複数選択を解除
+  else if (e.key === 'Escape') {
+    e.preventDefault();
+    if (selectedNodeIds.length > 0) {
+      selectedNodeIds = [];
+      renderTree();
+      updateToolbar();
     }
   }
 
@@ -905,23 +1294,54 @@ document.addEventListener('keydown', (e) => {
   // Delete: ノードを削除（選択モード時）
   else if (e.key === 'Delete') {
     e.preventDefault();
-    const parent = findParentNode(treeData, focusedNode.id);
-    if (parent) {
-      saveHistory(); // 履歴を保存
-      const siblings = parent.children;
-      const index = siblings.findIndex(n => n.id === focusedNode.id);
-      siblings.splice(index, 1);
 
-      // フォーカスを移動
-      if (siblings.length > 0) {
-        focusedNodeId = siblings[Math.max(0, index - 1)].id;
-      } else if (parent.id !== 'root') {
-        focusedNodeId = parent.id;
+    // 複数選択されている場合は全て削除
+    if (selectedNodeIds.length > 0) {
+      saveHistory();
+
+      selectedNodeIds.forEach(nodeId => {
+        const node = findNode(treeData, nodeId);
+        const parent = findParentNode(treeData, nodeId);
+        if (node && parent) {
+          const siblings = parent.children;
+          const index = siblings.findIndex(n => n.id === nodeId);
+          if (index !== -1) {
+            siblings.splice(index, 1);
+          }
+        }
+      });
+
+      selectedNodeIds = [];
+
+      // フォーカスを適切な位置に移動
+      const allNodes = getAllNodesFlat(treeData);
+      if (allNodes.length > 0) {
+        focusedNodeId = allNodes[0].id;
       } else {
         focusedNodeId = null;
       }
 
       renderTree();
+    } else {
+      // 単一ノードの削除
+      const parent = findParentNode(treeData, focusedNode.id);
+      if (parent) {
+        saveHistory(); // 履歴を保存
+        const siblings = parent.children;
+        const index = siblings.findIndex(n => n.id === focusedNode.id);
+        siblings.splice(index, 1);
+
+        // フォーカスを移動
+        if (siblings.length > 0) {
+          focusedNodeId = siblings[Math.max(0, index - 1)].id;
+        } else if (parent.id !== 'root') {
+          focusedNodeId = parent.id;
+        } else {
+          focusedNodeId = null;
+        }
+
+        renderTree();
+      }
     }
   }
 
@@ -1057,10 +1477,17 @@ document.addEventListener('keydown', (e) => {
       console.log('ノードをペーストしました');
     }
   }
+
+  // Ctrl/Cmd + F: 検索バーを表示
+  else if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+    e.preventDefault();
+    showSearchBar();
+  }
 });
 
 // IPCイベントリスナー
 ipcRenderer.on('save-file', saveFile);
+ipcRenderer.on('save-file-as', saveFileAs);
 ipcRenderer.on('load-file', (event, data) => loadFile(data));
 ipcRenderer.on('new-file', newFile);
 
@@ -1237,6 +1664,286 @@ window.hasUnsavedChanges = false;
 
 // 初期ツールバー状態を更新
 updateToolbar();
+
+// 検索機能
+let searchResults = [];
+let currentSearchIndex = -1;
+
+function showSearchBar() {
+  const searchBar = document.getElementById('search-bar');
+  const searchInput = document.getElementById('search-input');
+  searchBar.style.display = 'flex';
+  searchInput.focus();
+  searchInput.select();
+}
+
+function hideSearchBar() {
+  const searchBar = document.getElementById('search-bar');
+  searchBar.style.display = 'none';
+  searchResults = [];
+  currentSearchIndex = -1;
+  updateSearchResults();
+  // 検索ハイライトをクリア
+  clearSearchHighlights();
+}
+
+function clearSearchHighlights() {
+  document.querySelectorAll('.node-input').forEach(input => {
+    input.style.backgroundColor = '';
+  });
+}
+
+function performSearch(query) {
+  if (!query) {
+    searchResults = [];
+    currentSearchIndex = -1;
+    clearSearchHighlights();
+    updateSearchResults();
+    return;
+  }
+
+  // すべてのノードを検索
+  searchResults = [];
+  const allNodes = getAllNodesFlat(treeData);
+
+  allNodes.forEach(node => {
+    if (node.text.toLowerCase().includes(query.toLowerCase())) {
+      searchResults.push(node.id);
+    }
+  });
+
+  currentSearchIndex = searchResults.length > 0 ? 0 : -1;
+  updateSearchResults();
+  highlightSearchResults();
+
+  if (currentSearchIndex >= 0) {
+    focusSearchResult(currentSearchIndex);
+  }
+}
+
+function getAllNodesFlat(node, result = []) {
+  if (node.id !== 'root') {
+    result.push(node);
+  }
+  if (node.children) {
+    node.children.forEach(child => getAllNodesFlat(child, result));
+  }
+  return result;
+}
+
+function highlightSearchResults() {
+  clearSearchHighlights();
+
+  searchResults.forEach((nodeId, index) => {
+    const nodeElement = document.querySelector(`[data-node-id="${nodeId}"]`);
+    if (nodeElement) {
+      const input = nodeElement.querySelector('.node-input');
+      if (input) {
+        if (index === currentSearchIndex) {
+          input.style.backgroundColor = '#ffa500'; // オレンジ（現在の結果）
+        } else {
+          input.style.backgroundColor = '#ffff99'; // 黄色（その他の結果）
+        }
+      }
+    }
+  });
+}
+
+function focusSearchResult(index) {
+  if (index < 0 || index >= searchResults.length) return;
+
+  const nodeId = searchResults[index];
+  focusedNodeId = nodeId;
+
+  // ノードが折りたたまれた親の中にある場合、親を展開する
+  expandParentsOfNode(nodeId);
+
+  renderTree();
+
+  // ノードまでスクロール
+  setTimeout(() => {
+    const nodeElement = document.querySelector(`[data-node-id="${nodeId}"]`);
+    if (nodeElement) {
+      nodeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    highlightSearchResults();
+  }, 100);
+}
+
+function expandParentsOfNode(nodeId) {
+  let currentId = nodeId;
+  while (currentId) {
+    const parent = findParentNode(treeData, currentId);
+    if (parent && parent.id !== 'root') {
+      parent.collapsed = false;
+      currentId = parent.id;
+    } else {
+      break;
+    }
+  }
+}
+
+function nextSearchResult() {
+  if (searchResults.length === 0) return;
+  currentSearchIndex = (currentSearchIndex + 1) % searchResults.length;
+  focusSearchResult(currentSearchIndex);
+  updateSearchResults();
+}
+
+function prevSearchResult() {
+  if (searchResults.length === 0) return;
+  currentSearchIndex = (currentSearchIndex - 1 + searchResults.length) % searchResults.length;
+  focusSearchResult(currentSearchIndex);
+  updateSearchResults();
+}
+
+function updateSearchResults() {
+  const resultsSpan = document.getElementById('search-results');
+  if (searchResults.length === 0) {
+    resultsSpan.textContent = '結果なし';
+  } else {
+    resultsSpan.textContent = `${currentSearchIndex + 1} / ${searchResults.length}`;
+  }
+}
+
+// 検索バーのイベントリスナー
+document.getElementById('search-input').addEventListener('input', (e) => {
+  performSearch(e.target.value);
+});
+
+document.getElementById('search-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    if (e.shiftKey) {
+      prevSearchResult();
+    } else {
+      nextSearchResult();
+    }
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    hideSearchBar();
+  }
+});
+
+document.getElementById('search-next').addEventListener('click', nextSearchResult);
+document.getElementById('search-prev').addEventListener('click', prevSearchResult);
+document.getElementById('search-close').addEventListener('click', hideSearchBar);
+
+// エクスポート機能
+function exportAsMarkdown() {
+  let markdown = '';
+
+  function nodeToMarkdown(node, depth = 0) {
+    const indent = '  '.repeat(depth);
+    const bullet = depth === 0 ? '#' : '-';
+    const text = node.text || '(空)';
+
+    if (depth === 0) {
+      markdown += `${bullet} ${text}\n\n`;
+    } else {
+      markdown += `${indent}${bullet} ${text}\n`;
+    }
+
+    if (node.memo && node.memo.trim()) {
+      markdown += `${indent}  > ${node.memo.trim()}\n`;
+    }
+
+    if (node.children && node.children.length > 0) {
+      node.children.forEach(child => nodeToMarkdown(child, depth + 1));
+    }
+  }
+
+  treeData.children.forEach(child => nodeToMarkdown(child, 0));
+
+  ipcRenderer.invoke('export-markdown', markdown).then(result => {
+    if (result.success) {
+      console.log('Markdown exported successfully');
+    } else if (!result.canceled) {
+      console.error('Failed to export markdown:', result.error);
+    }
+  });
+}
+
+function exportAsText() {
+  let text = '';
+
+  function nodeToText(node, depth = 0) {
+    const indent = '  '.repeat(depth);
+    const nodeText = node.text || '(空)';
+    text += `${indent}${nodeText}\n`;
+
+    if (node.memo && node.memo.trim()) {
+      text += `${indent}  [メモ: ${node.memo.trim()}]\n`;
+    }
+
+    if (node.children && node.children.length > 0) {
+      node.children.forEach(child => nodeToText(child, depth + 1));
+    }
+  }
+
+  treeData.children.forEach(child => nodeToText(child, 0));
+
+  ipcRenderer.invoke('export-text', text).then(result => {
+    if (result.success) {
+      console.log('Text exported successfully');
+    } else if (!result.canceled) {
+      console.error('Failed to export text:', result.error);
+    }
+  });
+}
+
+async function exportAsPNG() {
+  const treeContainer = document.getElementById('tree-container');
+
+  // html2canvasライブラリがないので、代わりにスクリーンショット機能を使う
+  try {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // ツリーコンテナのサイズを取得
+    const rect = treeContainer.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+
+    // 背景を白にする
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 簡易的なレンダリング（テキストのみ）
+    ctx.fillStyle = '#333';
+    ctx.font = '12px sans-serif';
+
+    let y = 20;
+    function drawNode(node, depth = 0) {
+      const x = 20 + (depth * 40);
+      const text = node.text || '(空)';
+      ctx.fillText(text, x, y);
+      y += 20;
+
+      if (node.children && node.children.length > 0) {
+        node.children.forEach(child => drawNode(child, depth + 1));
+      }
+    }
+
+    treeData.children.forEach(child => drawNode(child, 0));
+
+    const dataURL = canvas.toDataURL('image/png');
+
+    const result = await ipcRenderer.invoke('export-png', dataURL);
+    if (result.success) {
+      console.log('PNG exported successfully');
+    } else if (!result.canceled) {
+      console.error('Failed to export PNG:', result.error);
+    }
+  } catch (err) {
+    console.error('Failed to create PNG:', err);
+  }
+}
+
+// エクスポートイベントリスナー
+ipcRenderer.on('export-markdown', exportAsMarkdown);
+ipcRenderer.on('export-text', exportAsText);
+ipcRenderer.on('export-png', exportAsPNG);
 
 // ウィンドウへのファイルドラッグアンドドロップ処理
 document.addEventListener('dragover', (e) => {
