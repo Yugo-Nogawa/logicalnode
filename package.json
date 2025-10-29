@@ -5,7 +5,16 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder"
+    "build": "electron-builder",
+    "cap:sync": "npx cap sync",
+    "cap:open:ios": "npx cap open ios",
+    "cap:run:ios": "npx cap run ios",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "tauri:build:windows": "tauri build --target x86_64-pc-windows-msvc",
+    "tauri:android": "tauri android init && tauri android dev",
+    "tauri:ios": "tauri ios init && tauri ios dev"
   },
   "keywords": [
     "logical-node",
@@ -16,6 +25,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@tauri-apps/cli": "^2.9.1",
     "electron": "^28.0.0",
     "electron-builder": "^24.9.0",
     "electron-packager": "^17.1.2",
@@ -47,5 +57,16 @@
       "icon": "assets/icons/icon.png",
       "category": "Utility"
     }
+  },
+  "dependencies": {
+    "@capacitor/cli": "^7.4.4",
+    "@capacitor/core": "^7.4.4",
+    "@capacitor/dialog": "^7.0.2",
+    "@capacitor/filesystem": "^7.1.4",
+    "@capacitor/ios": "^7.4.4",
+    "@capacitor/share": "^7.0.2",
+    "@tauri-apps/api": "^2.9.0",
+    "@tauri-apps/plugin-dialog": "^2.4.2",
+    "@tauri-apps/plugin-fs": "^2.4.4"
   }
 }

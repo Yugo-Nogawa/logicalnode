@@ -1,0 +1,11 @@
+{
+  "appId": "com.logicalnode3.app",
+  "appName": "Logical Node 3",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0
+    }
+  }
+}

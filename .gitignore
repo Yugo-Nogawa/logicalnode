@@ -1,8 +1,59 @@
+# Node modules
 node_modules/
+*/node_modules/
+tauri/node_modules/
+electron/node_modules/
+capacitor/node_modules/
+
+# Build outputs
 dist/
-*.log
+build/
+out/
+
+# Tauri
+tauri/src-tauri/target/
+tauri/src-tauri/WixTools/
+tauri/src-tauri/Cargo.lock
+
+# Electron
+electron/dist/
+electron/out/
+
+# Capacitor
+capacitor/ios/App/Pods/
+capacitor/ios/App/*.xcworkspace
+capacitor/ios/App/*.xcodeproj/xcuserdata/
+capacitor/ios/App/*.xcodeproj/project.xcworkspace/xcuserdata/
+capacitor/android/app/build/
+capacitor/android/.gradle/
+capacitor/android/local.properties
+
+# OS files
 .DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+*.tmp
+*.temp
+
+# Claude
 .claude/

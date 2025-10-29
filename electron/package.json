@@ -1,0 +1,50 @@
+{
+  "name": "logical-node-3-electron",
+  "version": "1.0.0",
+  "description": "Logical Node 3 - Electron Edition (Desktop)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
+  },
+  "keywords": [
+    "logical-node",
+    "logic-tree",
+    "electron",
+    "desktop"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.0"
+  },
+  "build": {
+    "appId": "com.logicalnode3.app",
+    "productName": "Logical Node 3",
+    "files": [
+      "**/*",
+      "!node_modules/**/*"
+    ],
+    "directories": {
+      "buildResources": "assets"
+    },
+    "win": {
+      "target": "zip",
+      "icon": "assets/icons/icon.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icons/icon.png",
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icons/icon.png",
+      "category": "Utility"
+    }
+  }
+}

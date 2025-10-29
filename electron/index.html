@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logical Node 3</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <div id="toolbar">
+      <div class="toolbar-group">
+        <button id="add-child-btn" class="toolbar-btn" title="子ノード追加 (Tab)">子ノード</button>
+        <button id="add-sibling-btn" class="toolbar-btn" title="兄弟ノード追加 (Enter)">兄弟</button>
+      </div>
+      <div class="toolbar-separator"></div>
+      <div class="toolbar-group">
+        <button id="outdent-btn" class="toolbar-btn" title="階層を上げる (Ctrl+←)">← 上へ</button>
+        <button id="indent-btn" class="toolbar-btn" title="階層を下げる (Ctrl+→)">下へ →</button>
+      </div>
+      <div class="toolbar-separator"></div>
+      <div class="toolbar-group">
+        <button id="move-up-btn" class="toolbar-btn" title="順序を上げる (Ctrl+↑)">↑ 上</button>
+        <button id="move-down-btn" class="toolbar-btn" title="順序を下げる (Ctrl+↓)">↓ 下</button>
+      </div>
+      <div class="toolbar-separator"></div>
+      <div class="toolbar-group">
+        <button id="add-memo-btn" class="toolbar-btn" title="メモ追加 (Ctrl+7)">メモ</button>
+      </div>
+      <div class="toolbar-separator"></div>
+      <div class="toolbar-group">
+        <button id="bold-btn" class="toolbar-btn" title="太字 (Ctrl+B)">
+          <strong>B</strong>
+        </button>
+      </div>
+      <div class="toolbar-group">
+        <span class="toolbar-label">色:</span>
+        <button class="color-btn" data-color="null" title="デフォルト" style="background-color: #333;"></button>
+        <button class="color-btn" data-color="red" title="赤 (Ctrl+1)" style="background-color: red;"></button>
+        <button class="color-btn" data-color="blue" title="青 (Ctrl+2)" style="background-color: blue;"></button>
+        <button class="color-btn" data-color="green" title="緑 (Ctrl+3)" style="background-color: green;"></button>
+        <button class="color-btn" data-color="orange" title="オレンジ (Ctrl+4)" style="background-color: orange;"></button>
+        <button class="color-btn" data-color="purple" title="紫 (Ctrl+5)" style="background-color: purple;"></button>
+      </div>
+    </div>
+    <div id="breadcrumb"></div>
+    <div id="search-bar" style="display: none;">
+      <input type="text" id="search-input" placeholder="検索... (Esc で閉じる)" />
+      <span id="search-results"></span>
+      <button id="search-prev" class="search-nav-btn" title="前を検索 (Shift+Enter)">↑</button>
+      <button id="search-next" class="search-nav-btn" title="次を検索 (Enter)">↓</button>
+      <button id="search-close" class="search-nav-btn" title="閉じる (Esc)">×</button>
+    </div>
+    <div id="main-content">
+      <div id="tree-container"></div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
