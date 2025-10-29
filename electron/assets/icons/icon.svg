@@ -1,0 +1,201 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradients for modern look -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2d3748;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a202c;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="nodeGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4299e1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3182ce;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="nodeGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#718096;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4a5568;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="nodeGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a0aec0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#718096;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Shadow filter -->
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="2" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.3"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Glow filter for accent node -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background with rounded corners -->
+  <rect width="512" height="512" fill="url(#bgGrad)" rx="90"/>
+
+  <!-- Tree structure with trunk and radial branches -->
+
+  <!-- Connections (back layer) -->
+  <!-- Center to Level 1 - 全方向（8方向） -->
+  <line x1="256" y1="256" x2="256" y2="140" stroke="#4a5568" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+  <line x1="256" y1="256" x2="338" y2="174" stroke="#4a5568" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+  <line x1="256" y1="256" x2="372" y2="256" stroke="#4a5568" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+  <line x1="256" y1="256" x2="140" y2="256" stroke="#4a5568" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+  <line x1="256" y1="256" x2="174" y2="174" stroke="#4a5568" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+  <!-- 下方向の枝 - 中央から斜めに -->
+  <line x1="256" y1="256" x2="206" y2="330" stroke="#4a5568" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+  <line x1="256" y1="256" x2="306" y2="330" stroke="#4a5568" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+  <line x1="256" y1="256" x2="345" y2="325" stroke="#4a5568" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+  <line x1="256" y1="256" x2="167" y2="325" stroke="#4a5568" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+
+  <!-- 中心と中間レイヤーの間を埋める小さなノード用の線 -->
+  <line x1="256" y1="256" x2="290" y2="210" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="256" y1="256" x2="310" y2="256" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="256" y1="256" x2="222" y2="210" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="256" y1="256" x2="202" y2="256" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="256" y1="256" x2="220" y2="300" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="256" y1="256" x2="292" y2="300" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+
+  <!-- Level 1 to Level 2 - 不規則なパターン -->
+  <!-- Top branch - 3つ -->
+  <line x1="256" y1="140" x2="216" y2="85" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="256" y1="140" x2="256" y2="75" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="256" y1="140" x2="296" y2="85" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <!-- さらに枝分かれ -->
+  <line x1="216" y1="85" x2="195" y2="60" stroke="#4a5568" stroke-width="3" stroke-linecap="round" opacity="0.35"/>
+  <line x1="296" y1="85" x2="317" y2="60" stroke="#4a5568" stroke-width="3" stroke-linecap="round" opacity="0.35"/>
+
+  <!-- Top-right branch - 密度を上げる -->
+  <line x1="338" y1="174" x2="375" y2="135" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="338" y1="174" x2="400" y2="165" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="338" y1="174" x2="360" y2="110" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="338" y1="174" x2="385" y2="200" stroke="#4a5568" stroke-width="3" stroke-linecap="round" opacity="0.35"/>
+  <!-- さらに分岐 -->
+  <line x1="375" y1="135" x2="400" y2="105" stroke="#4a5568" stroke-width="3" stroke-linecap="round" opacity="0.35"/>
+
+  <!-- Right branch - 4つ -->
+  <line x1="372" y1="256" x2="420" y2="225" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="372" y1="256" x2="435" y2="253" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="372" y1="256" x2="420" y2="285" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="372" y1="256" x2="410" y2="305" stroke="#4a5568" stroke-width="3" stroke-linecap="round" opacity="0.35"/>
+
+  <!-- Left branch - 4つ -->
+  <line x1="140" y1="256" x2="92" y2="285" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="140" y1="256" x2="77" y2="253" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="140" y1="256" x2="92" y2="225" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="140" y1="256" x2="102" y2="305" stroke="#4a5568" stroke-width="3" stroke-linecap="round" opacity="0.35"/>
+
+  <!-- Top-left branch - 密度を上げる -->
+  <line x1="174" y1="174" x2="117" y2="165" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="174" y1="174" x2="137" y2="135" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="174" y1="174" x2="152" y2="110" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="174" y1="174" x2="127" y2="200" stroke="#4a5568" stroke-width="3" stroke-linecap="round" opacity="0.35"/>
+  <!-- さらに分岐 -->
+  <line x1="137" y1="135" x2="112" y2="105" stroke="#4a5568" stroke-width="3" stroke-linecap="round" opacity="0.35"/>
+
+  <!-- 下向きの枝から更に分岐 -->
+  <line x1="206" y1="330" x2="160" y2="370" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="206" y1="330" x2="170" y2="400" stroke="#4a5568" stroke-width="3" stroke-linecap="round" opacity="0.35"/>
+  <line x1="206" y1="330" x2="220" y2="385" stroke="#4a5568" stroke-width="3" stroke-linecap="round" opacity="0.35"/>
+
+  <line x1="306" y1="330" x2="352" y2="370" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="306" y1="330" x2="342" y2="400" stroke="#4a5568" stroke-width="3" stroke-linecap="round" opacity="0.35"/>
+  <line x1="306" y1="330" x2="292" y2="385" stroke="#4a5568" stroke-width="3" stroke-linecap="round" opacity="0.35"/>
+
+  <!-- 斜め下の枝からも分岐 -->
+  <line x1="167" y1="325" x2="115" y2="370" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="167" y1="325" x2="125" y2="400" stroke="#4a5568" stroke-width="3" stroke-linecap="round" opacity="0.35"/>
+
+  <line x1="345" y1="325" x2="397" y2="370" stroke="#4a5568" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <line x1="345" y1="325" x2="387" y2="400" stroke="#4a5568" stroke-width="3" stroke-linecap="round" opacity="0.35"/>
+
+  <!-- Outer nodes - より不規則に配置 -->
+  <!-- Top -->
+  <circle cx="216" cy="85" r="13" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="256" cy="75" r="13" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="296" cy="85" r="13" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="195" cy="60" r="11" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="317" cy="60" r="11" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+
+  <!-- Top-right -->
+  <circle cx="375" cy="135" r="13" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="400" cy="165" r="13" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="360" cy="110" r="13" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="385" cy="200" r="12" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="400" cy="105" r="11" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+
+  <!-- Right -->
+  <circle cx="420" cy="225" r="13" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="435" cy="253" r="13" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="420" cy="285" r="13" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="410" cy="305" r="12" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+
+  <!-- Left -->
+  <circle cx="92" cy="285" r="13" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="77" cy="253" r="13" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="92" cy="225" r="13" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="102" cy="305" r="12" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+
+  <!-- Top-left -->
+  <circle cx="117" cy="165" r="13" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="137" cy="135" r="13" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="152" cy="110" r="13" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="127" cy="200" r="12" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="112" cy="105" r="11" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+
+  <!-- 下方向のノード -->
+  <circle cx="160" cy="370" r="13" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="170" cy="400" r="12" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="220" cy="385" r="12" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="115" cy="370" r="13" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="125" cy="400" r="12" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+
+  <circle cx="352" cy="370" r="13" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="342" cy="400" r="12" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="292" cy="385" r="12" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="397" cy="370" r="13" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+  <circle cx="387" cy="400" r="12" fill="url(#nodeGrad3)" filter="url(#shadow)"/>
+
+  <!-- 中心と中間の間を埋める小さなノード -->
+  <circle cx="290" cy="210" r="12" fill="url(#nodeGrad2)" filter="url(#shadow)" opacity="0.8"/>
+  <circle cx="310" cy="256" r="12" fill="url(#nodeGrad2)" filter="url(#shadow)" opacity="0.8"/>
+  <circle cx="222" cy="210" r="12" fill="url(#nodeGrad2)" filter="url(#shadow)" opacity="0.8"/>
+  <circle cx="202" cy="256" r="12" fill="url(#nodeGrad2)" filter="url(#shadow)" opacity="0.8"/>
+  <circle cx="220" cy="300" r="12" fill="url(#nodeGrad2)" filter="url(#shadow)" opacity="0.8"/>
+  <circle cx="292" cy="300" r="12" fill="url(#nodeGrad2)" filter="url(#shadow)" opacity="0.8"/>
+
+  <!-- Inner ring (Level 1) - 全方向 -->
+  <circle cx="256" cy="140" r="18" fill="url(#nodeGrad2)" filter="url(#shadow)"/>
+  <circle cx="338" cy="174" r="18" fill="url(#nodeGrad2)" filter="url(#shadow)"/>
+  <circle cx="372" cy="256" r="18" fill="url(#nodeGrad2)" filter="url(#shadow)"/>
+  <circle cx="140" cy="256" r="18" fill="url(#nodeGrad2)" filter="url(#shadow)"/>
+  <circle cx="174" cy="174" r="18" fill="url(#nodeGrad2)" filter="url(#shadow)"/>
+  <!-- 下方向の分岐点 -->
+  <circle cx="206" cy="330" r="16" fill="url(#nodeGrad2)" filter="url(#shadow)"/>
+  <circle cx="306" cy="330" r="16" fill="url(#nodeGrad2)" filter="url(#shadow)"/>
+  <circle cx="345" cy="325" r="16" fill="url(#nodeGrad2)" filter="url(#shadow)"/>
+  <circle cx="167" cy="325" r="16" fill="url(#nodeGrad2)" filter="url(#shadow)"/>
+
+  <!-- Main trunk - from bottom to center (draw after nodes so it's on top) -->
+  <line x1="256" y1="470" x2="256" y2="270" stroke="#4299e1" stroke-width="28" stroke-linecap="round" filter="url(#shadow)" opacity="1"/>
+
+  <!-- Center node - Accent color with glow -->
+  <circle cx="256" cy="256" r="24" fill="url(#nodeGrad1)" filter="url(#glow)"/>
+
+  <!-- Inner highlight for depth -->
+  <circle cx="256" cy="246" r="10" fill="#63b3ed" opacity="0.6"/>
+</svg>

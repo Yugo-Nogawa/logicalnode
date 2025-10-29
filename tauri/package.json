@@ -1,0 +1,29 @@
+{
+  "name": "logical-node-3-tauri",
+  "version": "1.0.0",
+  "description": "Logical Node 3 - Tauri Edition (All Platforms)",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:windows": "tauri build --target x86_64-pc-windows-msvc",
+    "ios": "tauri ios init && tauri ios dev",
+    "android": "tauri android init && tauri android dev"
+  },
+  "keywords": [
+    "logical-node",
+    "logic-tree",
+    "tauri",
+    "cross-platform"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.9.1"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.9.0",
+    "@tauri-apps/plugin-dialog": "^2.4.2",
+    "@tauri-apps/plugin-fs": "^2.4.4"
+  }
+}

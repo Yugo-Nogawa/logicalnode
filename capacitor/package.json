@@ -1,0 +1,28 @@
+{
+  "name": "logical-node-3-capacitor",
+  "version": "1.0.0",
+  "description": "Logical Node 3 - Capacitor Edition (iOS/Android/Web)",
+  "scripts": {
+    "sync": "npx cap sync",
+    "open:ios": "npx cap open ios",
+    "run:ios": "npx cap run ios",
+    "open:android": "npx cap open android",
+    "run:android": "npx cap run android"
+  },
+  "keywords": [
+    "logical-node",
+    "logic-tree",
+    "capacitor",
+    "mobile"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@capacitor/cli": "^7.4.4",
+    "@capacitor/core": "^7.4.4",
+    "@capacitor/dialog": "^7.0.2",
+    "@capacitor/filesystem": "^7.1.4",
+    "@capacitor/ios": "^7.4.4",
+    "@capacitor/share": "^7.0.2"
+  }
+}
