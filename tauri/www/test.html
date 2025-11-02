@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Tauri Test</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      background: #f0f0f0;
+    }
+    .test-result {
+      margin: 10px 0;
+      padding: 10px;
+      background: white;
+      border-radius: 5px;
+    }
+    .success { color: green; }
+    .error { color: red; }
+  </style>
+</head>
+<body>
+  <h1>Tauri API Test</h1>
+  <div id="results"></div>
+
+  <script>
+    const results = document.getElementById('results');
+
+    function addResult(message, isSuccess) {
+      const div = document.createElement('div');
+      div.className = 'test-result ' + (isSuccess ? 'success' : 'error');
+      div.textContent = message;
+      results.appendChild(div);
+    }
+
+    // Test 1: Check if Tauri globals exist
+    addResult('Testing Tauri globals...', true);
+    addResult('window.__TAURI__: ' + typeof window.__TAURI__, typeof window.__TAURI__ !== 'undefined');
+    addResult('window.__TAURI_INTERNALS__: ' + typeof window.__TAURI_INTERNALS__, typeof window.__TAURI_INTERNALS__ !== 'undefined');
+
+    // Test 2: Check invoke function
+    try {
+      if (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke) {
+        addResult('✓ invoke function found in __TAURI_INTERNALS__', true);
+
+        // Test 3: Try calling a command
+        window.__TAURI_INTERNALS__.invoke('save_file', {
+          content: 'test',
+          defaultFilename: 'test.txt'
+        }).then(() => {
+          addResult('✓ invoke call succeeded (file dialog should appear)', true);
+        }).catch(err => {
+          addResult('invoke call result: ' + err, true);
+        });
+      } else {
+        addResult('✗ invoke function not found', false);
+      }
+    } catch (err) {
+      addResult('✗ Error: ' + err.message, false);
+    }
+
+    // Test 4: Show all window properties starting with __TAURI
+    const tauriProps = Object.keys(window).filter(k => k.startsWith('__TAURI'));
+    addResult('Tauri properties: ' + tauriProps.join(', '), tauriProps.length > 0);
+  </script>
+</body>
+</html>

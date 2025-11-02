@@ -1,7 +1,5 @@
-// Tauri対応版 renderer.js
-// Tauri APIを使用したファイル操作
-import { save, open } from '@tauri-apps/plugin-dialog';
-import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs';
+// Tauri API (withGlobalTauriで注入される)
+const invoke = window.__TAURI_INTERNALS__.invoke;
 
 // ツリーデータ構造
 let treeData = {
@@ -67,10 +65,10 @@ function checkUnsavedChanges() {
   updateWindowTitle();
 }
 
-// ウィンドウタイトルを更新（モバイル対応）
+// ウィンドウタイトルを更新
 function updateWindowTitle() {
   const prefix = window.hasUnsavedChanges ? '● ' : '';
-  document.title = `${prefix}LogicalNode`;
+  document.title = `${prefix}Logical Node 3`;
 }
 
 // Undo
@@ -840,69 +838,43 @@ function handleKeyPress(e, node) {
   }
 }
 
-// ファイル保存（Tauri File System APIを使用）
+// ファイル保存（上書き保存）
 async function saveFile() {
+  const data = JSON.stringify(treeData, null, 2);
   try {
-    const data = JSON.stringify(treeData, null, 2);
-
-    // ファイルダイアログを表示
-    const filePath = await save({
-      defaultPath: 'logicalnode.tree',
-      filters: [{
-        name: 'Tree Files',
-        extensions: ['tree']
-      }]
+    const filePath = await invoke('save_file', {
+      content: data,
+      defaultFilename: 'logicalnode.tree'
     });
-
-    if (filePath) {
-      // ファイルに保存
-      await writeTextFile(filePath, data);
-
-      // 保存済みデータを更新
-      savedTreeData = JSON.parse(JSON.stringify(treeData));
-      window.hasUnsavedChanges = false;
-      updateWindowTitle();
-
-      console.log('File saved to:', filePath);
-
-      // localStorageにも自動保存（バックアップ）
-      localStorage.setItem('logicalnode_data', data);
-    }
+    console.log('File saved to:', filePath);
+    // 保存済みデータを更新
+    savedTreeData = JSON.parse(JSON.stringify(treeData));
+    window.hasUnsavedChanges = false;
+    updateWindowTitle();
   } catch (err) {
-    console.error('Failed to save file:', err);
+    if (err !== 'No file selected') {
+      console.error('Failed to save file:', err);
+    }
   }
 }
 
-// ファイル別名保存（Tauri Dialog + File System APIを使用）
+// ファイル別名保存
 async function saveFileAs() {
+  const data = JSON.stringify(treeData, null, 2);
   try {
-    const data = JSON.stringify(treeData, null, 2);
-
-    // ファイルダイアログを表示
-    const filePath = await save({
-      defaultPath: 'logicalnode.tree',
-      filters: [{
-        name: 'Tree Files',
-        extensions: ['tree']
-      }]
+    const filePath = await invoke('save_file', {
+      content: data,
+      defaultFilename: 'logicalnode.tree'
     });
-
-    if (filePath) {
-      // ファイルに保存
-      await writeTextFile(filePath, data);
-
-      // 保存済みデータを更新
-      savedTreeData = JSON.parse(JSON.stringify(treeData));
-      window.hasUnsavedChanges = false;
-      updateWindowTitle();
-
-      console.log('File saved as:', filePath);
-
-      // localStorageにも自動保存（バックアップ）
-      localStorage.setItem('logicalnode_data', data);
-    }
+    console.log('File saved as:', filePath);
+    // 保存済みデータを更新
+    savedTreeData = JSON.parse(JSON.stringify(treeData));
+    window.hasUnsavedChanges = false;
+    updateWindowTitle();
   } catch (err) {
-    console.error('Failed to save file:', err);
+    if (err !== 'No file selected') {
+      console.error('Failed to save file:', err);
+    }
   }
 }
 
@@ -1526,13 +1498,13 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     showSearchBar();
   }
-
-  // Ctrl/Cmd + S: 保存
-  else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-    e.preventDefault();
-    saveFile();
-  }
 });
+
+// IPCイベントリスナー
+ipcRenderer.on('save-file', saveFile);
+ipcRenderer.on('save-file-as', saveFileAs);
+ipcRenderer.on('load-file', (event, data) => loadFile(data));
+ipcRenderer.on('new-file', newFile);
 
 // ツールバーのイベントリスナー
 document.getElementById('bold-btn').addEventListener('click', () => {
@@ -1694,6 +1666,19 @@ document.getElementById('add-memo-btn').addEventListener('click', () => {
     memoInput.setSelectionRange(memoInput.value.length, memoInput.value.length);
   }
 });
+
+// 初期レンダリング
+renderTree(true);
+
+// 初期状態を履歴に保存
+saveHistory();
+
+// 初期状態を保存済みとしてマーク（新規ファイルなので未保存フラグはfalse）
+savedTreeData = null;
+window.hasUnsavedChanges = false;
+
+// 初期ツールバー状態を更新
+updateToolbar();
 
 // 検索機能
 let searchResults = [];
@@ -1859,8 +1844,8 @@ document.getElementById('search-next').addEventListener('click', nextSearchResul
 document.getElementById('search-prev').addEventListener('click', prevSearchResult);
 document.getElementById('search-close').addEventListener('click', hideSearchBar);
 
-// エクスポート機能（Tauri Dialog + File System APIを使用）
-async function exportAsMarkdown() {
+// エクスポート機能
+function exportAsMarkdown() {
   let markdown = '';
 
   function nodeToMarkdown(node, depth = 0) {
@@ -1885,27 +1870,16 @@ async function exportAsMarkdown() {
 
   treeData.children.forEach(child => nodeToMarkdown(child, 0));
 
-  try {
-    // ファイルダイアログを表示
-    const filePath = await save({
-      defaultPath: 'logicalnode.md',
-      filters: [{
-        name: 'Markdown Files',
-        extensions: ['md']
-      }]
-    });
-
-    if (filePath) {
-      // ファイルに保存
-      await writeTextFile(filePath, markdown);
-      console.log('Markdown exported to:', filePath);
+  ipcRenderer.invoke('export-markdown', markdown).then(result => {
+    if (result.success) {
+      console.log('Markdown exported successfully');
+    } else if (!result.canceled) {
+      console.error('Failed to export markdown:', result.error);
     }
-  } catch (err) {
-    console.error('Failed to export markdown:', err);
-  }
+  });
 }
 
-async function exportAsText() {
+function exportAsText() {
   let text = '';
 
   function nodeToText(node, depth = 0) {
@@ -1924,124 +1898,95 @@ async function exportAsText() {
 
   treeData.children.forEach(child => nodeToText(child, 0));
 
-  try {
-    // ファイルダイアログを表示
-    const filePath = await save({
-      defaultPath: 'logicalnode.txt',
-      filters: [{
-        name: 'Text Files',
-        extensions: ['txt']
-      }]
-    });
+  ipcRenderer.invoke('export-text', text).then(result => {
+    if (result.success) {
+      console.log('Text exported successfully');
+    } else if (!result.canceled) {
+      console.error('Failed to export text:', result.error);
+    }
+  });
+}
 
-    if (filePath) {
-      // ファイルに保存
-      await writeTextFile(filePath, text);
-      console.log('Text exported to:', filePath);
+async function exportAsPNG() {
+  const treeContainer = document.getElementById('tree-container');
+
+  // html2canvasライブラリがないので、代わりにスクリーンショット機能を使う
+  try {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // ツリーコンテナのサイズを取得
+    const rect = treeContainer.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+
+    // 背景を白にする
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 簡易的なレンダリング（テキストのみ）
+    ctx.fillStyle = '#333';
+    ctx.font = '12px sans-serif';
+
+    let y = 20;
+    function drawNode(node, depth = 0) {
+      const x = 20 + (depth * 40);
+      const text = node.text || '(空)';
+      ctx.fillText(text, x, y);
+      y += 20;
+
+      if (node.children && node.children.length > 0) {
+        node.children.forEach(child => drawNode(child, depth + 1));
+      }
+    }
+
+    treeData.children.forEach(child => drawNode(child, 0));
+
+    const dataURL = canvas.toDataURL('image/png');
+
+    const result = await ipcRenderer.invoke('export-png', dataURL);
+    if (result.success) {
+      console.log('PNG exported successfully');
+    } else if (!result.canceled) {
+      console.error('Failed to export PNG:', result.error);
     }
   } catch (err) {
-    console.error('Failed to export text:', err);
+    console.error('Failed to create PNG:', err);
   }
 }
 
-// ファイル読み込みボタンの追加（Tauri Dialog APIを使用）
-async function openFileDialog() {
-  try {
-    // ファイル選択ダイアログを表示
-    const selected = await open({
-      multiple: false,
-      filters: [{
-        name: 'Tree Files',
-        extensions: ['tree', 'json']
-      }]
-    });
+// DOMの準備ができたら初期化
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('DOM loaded, initializing...');
 
-    if (selected) {
-      // ファイルを読み込み
-      const data = await readTextFile(selected);
-      loadFile(data);
-      console.log('File loaded from:', selected);
-    }
-  } catch (err) {
-    console.error('Failed to open file:', err);
-  }
-}
-
-// 初期レンダリング
-renderTree(true);
-
-// 初期状態を履歴に保存
-saveHistory();
-
-// 初期状態を保存済みとしてマーク（新規ファイルなので未保存フラグはfalse）
-savedTreeData = null;
-window.hasUnsavedChanges = false;
-
-// 初期ツールバー状態を更新
-updateToolbar();
-
-// localStorageからデータを読み込む（起動時）
-window.addEventListener('DOMContentLoaded', () => {
-  const savedData = localStorage.getItem('logicalnode_data');
-  if (savedData) {
-    try {
-      loadFile(savedData);
-    } catch (err) {
-      console.error('Failed to load saved data:', err);
-    }
-  }
-});
-
-// 自動保存（5秒ごと）
-setInterval(() => {
-  if (window.hasUnsavedChanges) {
-    saveFile();
-  }
-}, 5000);
-
-// UIボタンのイベントリスナー
-document.getElementById('new-btn').addEventListener('click', () => {
-  if (window.hasUnsavedChanges) {
-    if (confirm('未保存の変更があります。新規ファイルを作成しますか？')) {
+  // New ボタン
+  document.getElementById('new-btn').addEventListener('click', () => {
+    if (window.hasUnsavedChanges) {
+      if (confirm('保存されていない変更があります。新規ファイルを作成しますか？')) {
+        newFile();
+      }
+    } else {
       newFile();
     }
-  } else {
-    newFile();
-  }
-});
+  });
 
-document.getElementById('save-btn').addEventListener('click', saveFile);
+  // Save ボタン
+  document.getElementById('save-btn').addEventListener('click', saveFile);
 
-document.getElementById('load-btn').addEventListener('click', () => {
-  openFileDialog();
-});
+  // Load ボタン
+  document.getElementById('load-btn').addEventListener('click', async () => {
+    try {
+      const content = await invoke('open_file');
+      loadFile(content);
+    } catch (err) {
+      if (err !== 'No file selected') {
+        console.error('Failed to open file:', err);
+      }
+    }
+  });
 
-document.getElementById('menu-btn').addEventListener('click', () => {
-  document.getElementById('menu-modal').style.display = 'block';
-});
+  // 初期レンダリング
+  renderTree();
 
-document.getElementById('close-menu-btn').addEventListener('click', () => {
-  document.getElementById('menu-modal').style.display = 'none';
-});
-
-document.getElementById('export-markdown-btn').addEventListener('click', () => {
-  exportAsMarkdown();
-  document.getElementById('menu-modal').style.display = 'none';
-});
-
-document.getElementById('export-text-btn').addEventListener('click', () => {
-  exportAsText();
-  document.getElementById('menu-modal').style.display = 'none';
-});
-
-document.getElementById('export-json-btn').addEventListener('click', () => {
-  saveFileAs();
-  document.getElementById('menu-modal').style.display = 'none';
-});
-
-// モーダルの背景クリックで閉じる
-document.querySelector('.modal-overlay').addEventListener('click', (e) => {
-  if (e.target === e.currentTarget) {
-    document.getElementById('menu-modal').style.display = 'none';
-  }
+  console.log('Logical Node 3 initialized successfully');
 });

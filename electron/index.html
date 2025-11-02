@@ -29,18 +29,22 @@
       </div>
       <div class="toolbar-separator"></div>
       <div class="toolbar-group">
+        <button id="add-sticky-btn" class="toolbar-btn" title="付箋を追加 (Ctrl+8)">付箋</button>
+      </div>
+      <div class="toolbar-separator"></div>
+      <div class="toolbar-group">
         <button id="bold-btn" class="toolbar-btn" title="太字 (Ctrl+B)">
           <strong>B</strong>
         </button>
       </div>
       <div class="toolbar-group">
         <span class="toolbar-label">色:</span>
-        <button class="color-btn" data-color="null" title="デフォルト" style="background-color: #333;"></button>
-        <button class="color-btn" data-color="red" title="赤 (Ctrl+1)" style="background-color: red;"></button>
-        <button class="color-btn" data-color="blue" title="青 (Ctrl+2)" style="background-color: blue;"></button>
-        <button class="color-btn" data-color="green" title="緑 (Ctrl+3)" style="background-color: green;"></button>
-        <button class="color-btn" data-color="orange" title="オレンジ (Ctrl+4)" style="background-color: orange;"></button>
-        <button class="color-btn" data-color="purple" title="紫 (Ctrl+5)" style="background-color: purple;"></button>
+        <button class="color-btn" data-color="null" title="黒 (Ctrl+1)" style="background-color: #333;"></button>
+        <button class="color-btn" data-color="red" title="赤 (Ctrl+2)" style="background-color: red;"></button>
+        <button class="color-btn" data-color="blue" title="青 (Ctrl+3)" style="background-color: blue;"></button>
+        <button class="color-btn" data-color="green" title="緑 (Ctrl+4)" style="background-color: green;"></button>
+        <button class="color-btn" data-color="orange" title="オレンジ (Ctrl+5)" style="background-color: orange;"></button>
+        <button class="color-btn" data-color="purple" title="紫 (Ctrl+6)" style="background-color: purple;"></button>
       </div>
     </div>
     <div id="breadcrumb"></div>
@@ -52,8 +56,13 @@
       <button id="search-close" class="search-nav-btn" title="閉じる (Esc)">×</button>
     </div>
     <div id="main-content">
+      <!-- スクロール連動付箋コンテナ -->
+      <div id="sticky-notes-scroll-container"></div>
       <div id="tree-container"></div>
     </div>
+
+    <!-- 固定付箋コンテナ -->
+    <div id="sticky-notes-container"></div>
   </div>
 
   <script src="renderer.js"></script>

@@ -55,5 +55,38 @@ yarn-error.log*
 *.tmp
 *.temp
 
+# Executables and binaries
+*.exe
+*.app
+*.dmg
+*.deb
+*.rpm
+*.msi
+
+# Generated files
+tauri/src-tauri/gen/
+tauri/src-tauri/icons/
+nul
+
+# Backup and test files
+*.backup
+*-test.*
+*-debug.*
+
+# Screenshots
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Package locks (keep package.json but ignore locks for cleaner diffs)
+package-lock.json
+*/package-lock.json
+
+# Quasar
+quasar/.quasar/
+quasar/dist/
+quasar/node_modules/
+
 # Claude
 .claude/
