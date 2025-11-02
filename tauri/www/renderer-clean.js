@@ -1,4 +1,12 @@
-const { ipcRenderer } = require('electron');
+// Tauri API
+const invoke = window.__TAURI_INTERNALS__.invoke;
+
+// ipcRendererのダミーオブジェクト（Tauriでは使用しないが、互換性のため定義）
+const ipcRenderer = {
+  invoke: () => {
+    // Tauriでは何もしない（tauri-adapter.jsでオーバーライド）
+  }
+};
 
 // ツリーデータ構造
 let treeData = {
@@ -10,13 +18,6 @@ let treeData = {
 let focusedNodeId = null;
 let nodeIdCounter = 1;
 let selectedNodeIds = []; // 複数選択されたノードのIDリスト
-
-// ノード間の関連線
-let nodeLinks = []; // { id, fromNodeId, toNodeId }
-let linkIdCounter = 1;
-let linkingMode = false; // リンク作成モードのフラグ
-let linkSourceNodeId = null; // リンク元のノードID
-let selectedLinkId = null; // 選択された矢印のID
 
 // Undo/Redo用の履歴管理
 let history = [];
@@ -217,19 +218,6 @@ function getPrevNavigableNode(nodeId) {
   return null;
 }
 
-// 接続線描画のデバウンス用タイマー
-let drawConnectionsTimer = null;
-
-// 接続線を描画（デバウンス付き）
-function drawConnectionsDebounced() {
-  if (drawConnectionsTimer) {
-    clearTimeout(drawConnectionsTimer);
-  }
-  drawConnectionsTimer = setTimeout(() => {
-    drawConnections();
-  }, 50); // 50ms後に描画
-}
-
 // 接続線を描画
 function drawConnections() {
   // 既存の線を削除
@@ -383,126 +371,6 @@ function drawConnections() {
   });
 }
 
-// 要素のコンテナ相対位置を取得
-function getPositionInContainer(element, container) {
-  const elementRect = element.getBoundingClientRect();
-  const containerRect = container.getBoundingClientRect();
-
-  // スクロール位置を考慮したコンテナ相対座標
-  const x = elementRect.left - containerRect.left + container.scrollLeft;
-  const y = elementRect.top - containerRect.top + container.scrollTop;
-
-  return { x, y };
-}
-
-// ノード間の関連線を描画
-function drawNodeLinks() {
-  // 既存のリンク線を削除
-  document.querySelectorAll('.node-link-line').forEach(el => el.remove());
-
-  if (nodeLinks.length === 0) return;
-
-  const container = document.getElementById('tree-container');
-  const mainContent = document.getElementById('main-content');
-
-  // SVGコンテナを作成
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.classList.add('node-link-line');
-  svg.style.position = 'absolute';
-  svg.style.top = '0';
-  svg.style.left = '0';
-  svg.style.width = '100%';
-  svg.style.height = '100%';
-  svg.style.pointerEvents = 'none';
-  svg.style.zIndex = '5';
-
-  // 各リンクを描画
-  nodeLinks.forEach(link => {
-    const fromElement = document.querySelector(`[data-node-id="${link.fromNodeId}"] .node-content`);
-    const toElement = document.querySelector(`[data-node-id="${link.toNodeId}"] .node-content`);
-
-    if (!fromElement || !toElement) return;
-
-    // tree-container内の絶対位置を取得（offsetを使用）
-    const fromNode = fromElement.closest('.tree-node');
-    const toNode = toElement.closest('.tree-node');
-
-    // tree-containerからの相対位置を計算
-    let fromX = 0, fromY = 0, toX = 0, toY = 0;
-
-    // fromElementの位置
-    let el = fromElement;
-    while (el && el !== container) {
-      fromX += el.offsetLeft || 0;
-      fromY += el.offsetTop || 0;
-      el = el.offsetParent;
-    }
-    fromX += fromElement.offsetWidth;
-    fromY += fromElement.offsetHeight / 2;
-
-    // toElementの位置
-    el = toElement;
-    while (el && el !== container) {
-      toX += el.offsetLeft || 0;
-      toY += el.offsetTop || 0;
-      el = el.offsetParent;
-    }
-    toY += toElement.offsetHeight / 2;
-
-    // 曲線パスを作成（ベジェ曲線）
-    const controlPointOffset = Math.abs(toX - fromX) / 2;
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    const d = `M ${fromX} ${fromY} C ${fromX + controlPointOffset} ${fromY}, ${toX - controlPointOffset} ${toY}, ${toX} ${toY}`;
-    path.setAttribute('d', d);
-    path.setAttribute('stroke', '#888');
-    path.setAttribute('stroke-width', '2');
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke-dasharray', '5,5');
-    path.setAttribute('data-link-id', link.id);
-    path.style.pointerEvents = 'stroke';
-    path.style.cursor = 'pointer';
-
-    // 選択状態のスタイル
-    if (selectedLinkId === link.id) {
-      path.setAttribute('stroke', '#0066cc');
-      path.setAttribute('stroke-width', '3');
-    }
-
-    // クリックイベント
-    path.addEventListener('click', (e) => {
-      e.stopPropagation();
-      selectedLinkId = link.id;
-      drawNodeLinks(); // 再描画して選択状態を反映
-    });
-
-    svg.appendChild(path);
-
-    // 矢印を描画
-    const arrowSize = 8;
-    const angle = Math.atan2(toY - fromY, toX - fromX);
-    const arrowX = toX - 5; // 少し手前に配置
-    const arrowY = toY;
-
-    const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-    const point1X = arrowX;
-    const point1Y = arrowY;
-    const point2X = arrowX - arrowSize * Math.cos(angle - Math.PI / 6);
-    const point2Y = arrowY - arrowSize * Math.sin(angle - Math.PI / 6);
-    const point3X = arrowX - arrowSize * Math.cos(angle + Math.PI / 6);
-    const point3Y = arrowY - arrowSize * Math.sin(angle + Math.PI / 6);
-
-    arrow.setAttribute('points', `${point1X},${point1Y} ${point2X},${point2Y} ${point3X},${point3Y}`);
-    arrow.setAttribute('fill', selectedLinkId === link.id ? '#0066cc' : '#888');
-    arrow.setAttribute('data-link-id', link.id);
-    arrow.style.pointerEvents = 'none';
-
-    svg.appendChild(arrow);
-  });
-
-  // SVGをtree-containerに追加（スクロールと一緒に動くように）
-  container.insertBefore(svg, container.firstChild);
-}
-
 // ツリーをレンダリング
 function renderTree(shouldEnterEditMode = false) {
   const container = document.getElementById('tree-container');
@@ -520,11 +388,10 @@ function renderTree(shouldEnterEditMode = false) {
     container.appendChild(renderNode(child));
   });
 
-  // 接続線を描画（DOMが完全に構築された後、デバウンス付き）
-  requestAnimationFrame(() => {
-    drawConnectionsDebounced();
-    drawNodeLinks(); // ノード間リンクも描画
-  });
+  // 接続線を描画（DOMが完全に構築された後）
+  setTimeout(() => {
+    drawConnections();
+  }, 0);
 
   // フォーカス状態を更新（パンくずリストも更新される）
   updateFocusedNode();
@@ -562,47 +429,6 @@ function renderNode(node) {
   const nodeContent = document.createElement('div');
   nodeContent.className = 'node-content';
   nodeContent.draggable = true;
-
-  // リンクモード時のクリックハンドラー
-  nodeContent.addEventListener('click', (e) => {
-    if (linkingMode && linkSourceNodeId) {
-      e.stopPropagation();
-      e.preventDefault();
-
-      // リンク先のノードとして選択
-      if (node.id !== linkSourceNodeId) {
-        // リンクを作成
-        const newLink = {
-          id: `link-${linkIdCounter++}`,
-          fromNodeId: linkSourceNodeId,
-          toNodeId: node.id
-        };
-        nodeLinks.push(newLink);
-
-        // リンクモードを終了
-        linkingMode = false;
-        const sourceElement = document.querySelector(`[data-node-id="${linkSourceNodeId}"]`);
-        if (sourceElement) {
-          sourceElement.classList.remove('linking-source');
-        }
-        linkSourceNodeId = null;
-
-        // 矢印を再描画
-        saveHistory();
-        drawNodeLinks();
-        console.log('リンクを作成しました');
-      } else {
-        // 自分自身へのリンクはキャンセル
-        linkingMode = false;
-        const sourceElement = document.querySelector(`[data-node-id="${linkSourceNodeId}"]`);
-        if (sourceElement) {
-          sourceElement.classList.remove('linking-source');
-        }
-        linkSourceNodeId = null;
-        console.log('リンク作成をキャンセルしました');
-      }
-    }
-  });
 
   // ドラッグ＆ドロップイベント
   nodeContent.addEventListener('dragstart', (e) => {
@@ -905,8 +731,6 @@ function updateFocusedNode() {
     const focusedElement = document.querySelector(`[data-node-id="${focusedNodeId}"]`);
     if (focusedElement) {
       focusedElement.classList.add('focused');
-      // 自動スクロール
-      scrollToNode(focusedElement);
     }
   }
 
@@ -920,20 +744,6 @@ function updateFocusedNode() {
 
   // パンくずリストを更新
   updateBreadcrumb();
-}
-
-// ノードが画面外にある場合、スクロールして表示
-function scrollToNode(nodeElement) {
-  if (!nodeElement) return;
-
-  const container = document.getElementById('main-content');
-  const containerRect = container.getBoundingClientRect();
-  const nodeRect = nodeElement.getBoundingClientRect();
-
-  // ノードが画面外にある場合のみスクロール
-  if (nodeRect.top < containerRect.top || nodeRect.bottom > containerRect.bottom) {
-    nodeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
 }
 
 // パンくずリストを更新
@@ -992,24 +802,18 @@ function handleKeyPress(e, node) {
     }
     e.preventDefault();
     e.stopPropagation(); // イベントの伝播を停止
-
-    // 入力をぼかしてから処理
-    e.target.blur();
-
-    setTimeout(() => {
-      const parent = findParentNode(treeData, node.id);
-      if (parent) {
-        saveHistory(); // 履歴を保存
-        const siblings = parent.children;
-        const index = siblings.findIndex(n => n.id === node.id);
-        const newNode = createNode('');
-        // Shift+Enterで上に、Enterで下に挿入
-        const insertIndex = e.shiftKey ? index : index + 1;
-        siblings.splice(insertIndex, 0, newNode);
-        focusedNodeId = newNode.id;
-        renderTree(true); // 編集モードで作成
-      }
-    }, 0);
+    const parent = findParentNode(treeData, node.id);
+    if (parent) {
+      saveHistory(); // 履歴を保存
+      const siblings = parent.children;
+      const index = siblings.findIndex(n => n.id === node.id);
+      const newNode = createNode('');
+      // Shift+Enterで上に、Enterで下に挿入
+      const insertIndex = e.shiftKey ? index : index + 1;
+      siblings.splice(insertIndex, 0, newNode);
+      focusedNodeId = newNode.id;
+      renderTree(false); // 選択モードで作成
+    }
   }
 
   // Tab: 子ノードを追加
@@ -1021,17 +825,11 @@ function handleKeyPress(e, node) {
     }
     e.preventDefault();
     e.stopPropagation(); // イベントの伝播を停止
-
-    // 入力をぼかしてから処理
-    e.target.blur();
-
-    setTimeout(() => {
-      saveHistory(); // 履歴を保存
-      const newNode = createNode('');
-      node.children.push(newNode);
-      focusedNodeId = newNode.id;
-      renderTree(true); // 自動フォーカス有効
-    }, 0);
+    saveHistory(); // 履歴を保存
+    const newNode = createNode('');
+    node.children.push(newNode);
+    focusedNodeId = newNode.id;
+    renderTree(true); // 自動フォーカス有効
   }
 
   // Escape: 編集モードから選択モードへ
@@ -1043,12 +841,7 @@ function handleKeyPress(e, node) {
 
 // ファイル保存（上書き保存）
 async function saveFile() {
-  const dataToSave = {
-    treeData: treeData,
-    stickyNotes: stickyNotes,
-    nodeLinks: nodeLinks
-  };
-  const data = JSON.stringify(dataToSave, null, 2);
+  const data = JSON.stringify(treeData, null, 2);
   const result = await ipcRenderer.invoke('save-file', data);
 
   if (result.success) {
@@ -1064,12 +857,7 @@ async function saveFile() {
 
 // ファイル別名保存
 async function saveFileAs() {
-  const dataToSave = {
-    treeData: treeData,
-    stickyNotes: stickyNotes,
-    nodeLinks: nodeLinks
-  };
-  const data = JSON.stringify(dataToSave, null, 2);
+  const data = JSON.stringify(treeData, null, 2);
   const result = await ipcRenderer.invoke('save-file-as', data);
 
   if (result.success) {
@@ -1087,20 +875,7 @@ async function saveFileAs() {
 function loadFile(data) {
   try {
     const parsed = JSON.parse(data);
-
-    // 新形式（treeDataとstickyNotesを含む）か旧形式（treeDataのみ）かを判定
-    if (parsed.treeData && parsed.stickyNotes !== undefined) {
-      // 新形式
-      treeData = parsed.treeData;
-      stickyNotes = parsed.stickyNotes || [];
-      nodeLinks = parsed.nodeLinks || [];
-    } else {
-      // 旧形式（後方互換性）
-      treeData = parsed;
-      stickyNotes = [];
-      nodeLinks = [];
-    }
-
+    treeData = parsed;
     focusedNodeId = treeData.children.length > 0 ? treeData.children[0].id : null;
 
     // ノードIDカウンターを更新
@@ -1115,33 +890,12 @@ function loadFile(data) {
     treeData.children.forEach(updateCounter);
     nodeIdCounter = maxId + 1;
 
-    // 付箋IDカウンターを更新
-    let maxStickyId = 0;
-    stickyNotes.forEach(note => {
-      const match = note.id.match(/sticky-(\d+)/);
-      if (match) {
-        maxStickyId = Math.max(maxStickyId, parseInt(match[1]));
-      }
-    });
-    stickyNoteIdCounter = maxStickyId + 1;
-
-    // リンクIDカウンターを更新
-    let maxLinkId = 0;
-    nodeLinks.forEach(link => {
-      const match = link.id.match(/link-(\d+)/);
-      if (match) {
-        maxLinkId = Math.max(maxLinkId, parseInt(match[1]));
-      }
-    });
-    linkIdCounter = maxLinkId + 1;
-
     // 読み込んだデータを保存済みとしてマーク
     savedTreeData = JSON.parse(JSON.stringify(treeData));
     window.hasUnsavedChanges = false;
     ipcRenderer.invoke('update-window-title', false);
 
     renderTree();
-    renderAllStickyNotes();
   } catch (err) {
     console.error('Failed to parse file:', err);
   }
@@ -1158,18 +912,7 @@ function newFile() {
   focusedNodeId = null;
   savedTreeData = null;
   window.hasUnsavedChanges = false;
-
-  // 付箋もクリア
-  stickyNotes = [];
-  stickyNoteIdCounter = 1;
-
-  // リンクもクリア
-  nodeLinks = [];
-  linkIdCounter = 1;
-  selectedLinkId = null;
-
   renderTree();
-  renderAllStickyNotes();
 }
 
 // グローバルキーボードイベント（選択モード用）
@@ -1268,7 +1011,7 @@ document.addEventListener('keydown', (e) => {
         if (!selectedNodeIds.includes(prevNode.id)) {
           selectedNodeIds.push(prevNode.id);
         }
-        updateFocusedNode();
+        renderTree();
         updateToolbar();
       }
     } else {
@@ -1277,7 +1020,7 @@ document.addEventListener('keydown', (e) => {
       const prevNode = getPrevNavigableNode(focusedNode.id);
       if (prevNode) {
         focusedNodeId = prevNode.id;
-        updateFocusedNode();
+        renderTree();
         updateToolbar();
       }
     }
@@ -1363,7 +1106,7 @@ document.addEventListener('keydown', (e) => {
         if (!selectedNodeIds.includes(nextNode.id)) {
           selectedNodeIds.push(nextNode.id);
         }
-        updateFocusedNode();
+        renderTree();
         updateToolbar();
       }
     } else {
@@ -1372,7 +1115,7 @@ document.addEventListener('keydown', (e) => {
       const nextNode = getNextNavigableNode(focusedNode.id);
       if (nextNode) {
         focusedNodeId = nextNode.id;
-        updateFocusedNode();
+        renderTree();
         updateToolbar();
       }
     }
@@ -1447,7 +1190,7 @@ document.addEventListener('keydown', (e) => {
       // ArrowRight: 子ノードへナビゲート
       if (focusedNode.children.length > 0) {
         focusedNodeId = focusedNode.children[0].id;
-        updateFocusedNode();
+        renderTree();
         updateToolbar();
       }
     }
@@ -1519,7 +1262,7 @@ document.addEventListener('keydown', (e) => {
       const parent = findParentNode(treeData, focusedNode.id);
       if (parent && parent.id !== 'root') {
         focusedNodeId = parent.id;
-        updateFocusedNode();
+        renderTree();
         updateToolbar();
       }
     }
@@ -1530,7 +1273,7 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     if (selectedNodeIds.length > 0) {
       selectedNodeIds = [];
-      updateFocusedNode();
+      renderTree();
       updateToolbar();
     }
   }
@@ -1549,28 +1292,16 @@ document.addEventListener('keydown', (e) => {
   // Tab: 子ノードを追加（選択モード時）
   else if (e.key === 'Tab') {
     e.preventDefault();
-
-    setTimeout(() => {
-      saveHistory(); // 履歴を保存
-      const newNode = createNode('');
-      focusedNode.children.push(newNode);
-      focusedNodeId = newNode.id;
-      renderTree(true); // 自動フォーカス有効
-    }, 0);
+    saveHistory(); // 履歴を保存
+    const newNode = createNode('');
+    focusedNode.children.push(newNode);
+    focusedNodeId = newNode.id;
+    renderTree(true); // 自動フォーカス有効
   }
 
   // Delete: ノードを削除（選択モード時）
   else if (e.key === 'Delete') {
     e.preventDefault();
-
-    // リンクが選択されている場合は削除
-    if (selectedLinkId) {
-      saveHistory();
-      nodeLinks = nodeLinks.filter(link => link.id !== selectedLinkId);
-      selectedLinkId = null;
-      drawNodeLinks();
-      return;
-    }
 
     // 複数選択されている場合は全て削除
     if (selectedNodeIds.length > 0) {
@@ -1650,33 +1381,17 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     focusedNode.bold = !focusedNode.bold;
     saveHistory();
-
-    // DOMを直接更新（再描画なし）
-    const nodeElement = document.querySelector(`[data-node-id="${focusedNodeId}"]`);
-    if (nodeElement) {
-      const input = nodeElement.querySelector('.node-input');
-      if (input) {
-        input.style.fontWeight = focusedNode.bold ? 'bold' : 'normal';
-      }
-    }
+    renderTree();
     updateToolbar();
   }
 
-  // Ctrl/Cmd + 1-6: 色変更（1:黒、2:赤、3:青、4:緑、5:オレンジ、6:紫）
-  else if ((e.ctrlKey || e.metaKey) && e.key >= '1' && e.key <= '6') {
+  // Ctrl/Cmd + 1-5: 色変更
+  else if ((e.ctrlKey || e.metaKey) && e.key >= '1' && e.key <= '5') {
     e.preventDefault();
-    const colors = ['null', null, 'red', 'blue', 'green', 'orange', 'purple'];
+    const colors = [null, 'red', 'blue', 'green', 'orange', 'purple'];
     focusedNode.color = colors[parseInt(e.key)];
     saveHistory();
-
-    // DOMを直接更新（再描画なし）
-    const nodeElement = document.querySelector(`[data-node-id="${focusedNodeId}"]`);
-    if (nodeElement) {
-      const input = nodeElement.querySelector('.node-input');
-      if (input) {
-        input.style.color = focusedNode.color || '';
-      }
-    }
+    renderTree();
     updateToolbar();
   }
 
@@ -1706,22 +1421,6 @@ document.addEventListener('keydown', (e) => {
       html.style.fontSize = (currentSize - 1) + 'px';
     }
     setTimeout(() => drawConnections(), 10);
-  }
-
-  // Ctrl/Cmd + L: ノード間リンクモード
-  else if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
-    e.preventDefault();
-    if (focusedNodeId) {
-      linkingMode = true;
-      linkSourceNodeId = focusedNodeId;
-      // フォーカスされたノードを視覚的に強調
-      const focusedElement = document.querySelector(`[data-node-id="${focusedNodeId}"]`);
-      if (focusedElement) {
-        focusedElement.classList.add('linking-source');
-      }
-      // ステータス表示（後で実装）
-      console.log('リンクモード: リンク先のノードをクリックしてください');
-    }
   }
 
   // Ctrl/Cmd + 7: メモ編集
@@ -1806,15 +1505,7 @@ document.getElementById('bold-btn').addEventListener('click', () => {
   if (focusedNode) {
     focusedNode.bold = !focusedNode.bold;
     saveHistory();
-
-    // DOMを直接更新（再描画なし）
-    const nodeElement = document.querySelector(`[data-node-id="${focusedNodeId}"]`);
-    if (nodeElement) {
-      const input = nodeElement.querySelector('.node-input');
-      if (input) {
-        input.style.fontWeight = focusedNode.bold ? 'bold' : 'normal';
-      }
-    }
+    renderTree();
     updateToolbar();
   }
 });
@@ -1826,15 +1517,7 @@ document.querySelectorAll('.color-btn').forEach(btn => {
       const color = btn.dataset.color;
       focusedNode.color = color === 'null' ? null : color;
       saveHistory();
-
-      // DOMを直接更新（再描画なし）
-      const nodeElement = document.querySelector(`[data-node-id="${focusedNodeId}"]`);
-      if (nodeElement) {
-        const input = nodeElement.querySelector('.node-input');
-        if (input) {
-          input.style.color = focusedNode.color || '';
-        }
-      }
+      renderTree();
       updateToolbar();
     }
   });
@@ -2298,435 +1981,5 @@ document.addEventListener('drop', async (e) => {
     } else {
       console.log('Only .tree files are supported');
     }
-  }
-});
-
-// =========================================
-// 付箋機能
-// =========================================
-
-let stickyNotes = [];
-let stickyNoteIdCounter = 1;
-
-// 付箋のデータ構造
-function createStickyNote(x = 100, y = 100) {
-  return {
-    id: `sticky-${stickyNoteIdCounter++}`,
-    x: x,
-    y: y,
-    width: 250,
-    height: 250,
-    color: 'yellow',
-    text: '',
-    drawingData: null, // Canvas描画データ
-    zIndex: Date.now(),
-    scrollMode: 'fixed' // 'fixed' or 'scroll' - 固定表示かスクロール連動か
-  };
-}
-
-// 付箋を作成してレンダリング
-function addStickyNote(x, y) {
-  const note = createStickyNote(x, y);
-  stickyNotes.push(note);
-  renderStickyNote(note);
-  saveStickyNotesHistory();
-}
-
-// 付箋を削除
-function deleteStickyNote(noteId) {
-  stickyNotes = stickyNotes.filter(note => note.id !== noteId);
-  const noteElement = document.getElementById(noteId);
-  if (noteElement) {
-    noteElement.remove();
-  }
-  saveStickyNotesHistory();
-}
-
-// 付箋をレンダリング
-function renderStickyNote(note) {
-  // モードに応じて適切なコンテナを選択
-  const containerId = note.scrollMode === 'fixed' ? 'sticky-notes-container' : 'sticky-notes-scroll-container';
-  const container = document.getElementById(containerId);
-
-  const noteElement = document.createElement('div');
-  noteElement.className = `sticky-note color-${note.color} ${note.scrollMode === 'fixed' ? 'fixed-mode' : 'scroll-mode'}`;
-  noteElement.id = note.id;
-  noteElement.style.left = note.x + 'px';
-  noteElement.style.top = note.y + 'px';
-  noteElement.style.width = note.width + 'px';
-  noteElement.style.height = note.height + 'px';
-  noteElement.style.zIndex = note.zIndex;
-
-  // ヘッダー
-  const header = document.createElement('div');
-  header.className = 'sticky-note-header';
-
-  const title = document.createElement('div');
-  title.className = 'sticky-note-title';
-  title.textContent = '付箋';
-
-  const controls = document.createElement('div');
-  controls.className = 'sticky-note-controls';
-
-  // 描画モードボタン
-  const drawBtn = document.createElement('button');
-  drawBtn.className = 'sticky-note-btn';
-  drawBtn.textContent = '✏️';
-  drawBtn.title = '描画モード';
-  let drawingMode = false;
-
-  drawBtn.addEventListener('click', () => {
-    drawingMode = !drawingMode;
-    const canvas = noteElement.querySelector('.sticky-note-canvas');
-    const drawingControls = noteElement.querySelector('.sticky-note-drawing-controls');
-
-    if (drawingMode) {
-      drawBtn.classList.add('active');
-      canvas.classList.add('drawing-mode');
-      if (drawingControls) {
-        drawingControls.style.display = 'flex';
-      }
-    } else {
-      drawBtn.classList.remove('active');
-      canvas.classList.remove('drawing-mode');
-      if (drawingControls) {
-        drawingControls.style.display = 'none';
-      }
-    }
-  });
-
-  // 消しゴムボタン
-  const clearBtn = document.createElement('button');
-  clearBtn.className = 'sticky-note-btn';
-  clearBtn.textContent = '🗑️';
-  clearBtn.title = '描画をクリア';
-  clearBtn.addEventListener('click', () => {
-    const canvas = noteElement.querySelector('.sticky-note-canvas');
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    note.drawingData = null;
-    saveStickyNotesHistory();
-  });
-
-  // スクロールモード切り替えボタン
-  const scrollModeBtn = document.createElement('button');
-  scrollModeBtn.className = 'sticky-note-btn';
-  scrollModeBtn.textContent = note.scrollMode === 'fixed' ? '📌' : '📄';
-  scrollModeBtn.title = note.scrollMode === 'fixed' ? '固定表示中 (クリックでスクロール連動)' : 'スクロール連動中 (クリックで固定表示)';
-
-  scrollModeBtn.addEventListener('click', () => {
-    // モードを切り替え
-    note.scrollMode = note.scrollMode === 'fixed' ? 'scroll' : 'fixed';
-
-    // ボタンの表示を更新
-    scrollModeBtn.textContent = note.scrollMode === 'fixed' ? '📌' : '📄';
-    scrollModeBtn.title = note.scrollMode === 'fixed' ? '固定表示中 (クリックでスクロール連動)' : 'スクロール連動中 (クリックで固定表示)';
-
-    // CSSクラスを更新
-    if (note.scrollMode === 'fixed') {
-      noteElement.classList.remove('scroll-mode');
-      noteElement.classList.add('fixed-mode');
-    } else {
-      noteElement.classList.remove('fixed-mode');
-      noteElement.classList.add('scroll-mode');
-    }
-
-    // 適切なコンテナに移動
-    const newContainerId = note.scrollMode === 'fixed' ? 'sticky-notes-container' : 'sticky-notes-scroll-container';
-    const newContainer = document.getElementById(newContainerId);
-    newContainer.appendChild(noteElement);
-
-    saveStickyNotesHistory();
-  });
-
-  // 削除ボタン
-  const deleteBtn = document.createElement('button');
-  deleteBtn.className = 'sticky-note-btn';
-  deleteBtn.textContent = '×';
-  deleteBtn.title = '付箋を削除';
-  deleteBtn.addEventListener('click', () => {
-    deleteStickyNote(note.id);
-  });
-
-  controls.appendChild(drawBtn);
-  controls.appendChild(clearBtn);
-  controls.appendChild(scrollModeBtn);
-  controls.appendChild(deleteBtn);
-
-  header.appendChild(title);
-  header.appendChild(controls);
-
-  // コンテンツエリア
-  const content = document.createElement('div');
-  content.className = 'sticky-note-content';
-
-  // テキストエリア
-  const textarea = document.createElement('textarea');
-  textarea.className = 'sticky-note-textarea';
-  textarea.placeholder = 'ここにテキストを入力...';
-  textarea.value = note.text;
-
-  textarea.addEventListener('input', () => {
-    note.text = textarea.value;
-    saveStickyNotesHistory();
-  });
-
-  // Canvas（描画用）
-  const canvas = document.createElement('canvas');
-  canvas.className = 'sticky-note-canvas';
-
-  content.appendChild(textarea);
-  content.appendChild(canvas);
-
-  // 色選択
-  const colorPicker = document.createElement('div');
-  colorPicker.className = 'sticky-note-color-picker';
-
-  const colors = ['yellow', 'pink', 'blue', 'green', 'orange'];
-  colors.forEach(color => {
-    const colorOption = document.createElement('div');
-    colorOption.className = `sticky-color-option sticky-color-${color}`;
-    if (note.color === color) {
-      colorOption.classList.add('selected');
-    }
-
-    colorOption.addEventListener('click', () => {
-      note.color = color;
-      // スクロールモードのクラスを保持したまま色を変更
-      noteElement.className = `sticky-note color-${color} ${note.scrollMode === 'fixed' ? 'fixed-mode' : 'scroll-mode'}`;
-
-      // 選択状態を更新
-      colorPicker.querySelectorAll('.sticky-color-option').forEach(opt => {
-        opt.classList.remove('selected');
-      });
-      colorOption.classList.add('selected');
-
-      saveStickyNotesHistory();
-    });
-
-    colorPicker.appendChild(colorOption);
-  });
-
-  // 描画コントロール
-  const drawingControls = document.createElement('div');
-  drawingControls.className = 'sticky-note-drawing-controls';
-  drawingControls.style.display = 'none';
-
-  // ペンの色選択
-  const penColors = ['#000000', '#ff0000', '#0000ff', '#00ff00', '#ffff00', '#ff00ff'];
-  let currentPenColor = '#000000';
-
-  penColors.forEach(color => {
-    const penColorBtn = document.createElement('div');
-    penColorBtn.className = 'pen-color-btn';
-    penColorBtn.style.backgroundColor = color;
-    if (color === currentPenColor) {
-      penColorBtn.classList.add('selected');
-    }
-
-    penColorBtn.addEventListener('click', () => {
-      currentPenColor = color;
-      drawingControls.querySelectorAll('.pen-color-btn').forEach(btn => {
-        btn.classList.remove('selected');
-      });
-      penColorBtn.classList.add('selected');
-    });
-
-    drawingControls.appendChild(penColorBtn);
-  });
-
-  // ペン幅スライダー
-  const penWidthControl = document.createElement('div');
-  penWidthControl.className = 'pen-width-control';
-
-  const penWidthLabel = document.createElement('span');
-  penWidthLabel.textContent = '太さ:';
-
-  const penWidthSlider = document.createElement('input');
-  penWidthSlider.type = 'range';
-  penWidthSlider.min = '1';
-  penWidthSlider.max = '10';
-  penWidthSlider.value = '2';
-  penWidthSlider.className = 'pen-width-slider';
-
-  penWidthControl.appendChild(penWidthLabel);
-  penWidthControl.appendChild(penWidthSlider);
-
-  drawingControls.appendChild(penWidthControl);
-
-  // 組み立て
-  noteElement.appendChild(header);
-  noteElement.appendChild(content);
-  noteElement.appendChild(colorPicker);
-  noteElement.appendChild(drawingControls);
-
-  container.appendChild(noteElement);
-
-  // Canvas のサイズ設定（コンテンツエリアに合わせる）
-  setTimeout(() => {
-    const contentRect = content.getBoundingClientRect();
-    canvas.width = contentRect.width;
-    canvas.height = contentRect.height;
-
-    // 保存された描画データを復元
-    if (note.drawingData) {
-      const img = new Image();
-      img.onload = () => {
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-      };
-      img.src = note.drawingData;
-    }
-  }, 0);
-
-  // Canvas 描画機能
-  const ctx = canvas.getContext('2d');
-  let isDrawing = false;
-  let lastX = 0;
-  let lastY = 0;
-
-  canvas.addEventListener('mousedown', (e) => {
-    if (!drawingMode) return;
-    isDrawing = true;
-    const rect = canvas.getBoundingClientRect();
-    lastX = e.clientX - rect.left;
-    lastY = e.clientY - rect.top;
-  });
-
-  canvas.addEventListener('mousemove', (e) => {
-    if (!isDrawing || !drawingMode) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    ctx.strokeStyle = currentPenColor;
-    ctx.lineWidth = parseInt(penWidthSlider.value);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    ctx.beginPath();
-    ctx.moveTo(lastX, lastY);
-    ctx.lineTo(x, y);
-    ctx.stroke();
-
-    lastX = x;
-    lastY = y;
-  });
-
-  canvas.addEventListener('mouseup', () => {
-    if (isDrawing) {
-      isDrawing = false;
-      // 描画データを保存
-      note.drawingData = canvas.toDataURL();
-      saveStickyNotesHistory();
-    }
-  });
-
-  canvas.addEventListener('mouseleave', () => {
-    if (isDrawing) {
-      isDrawing = false;
-      note.drawingData = canvas.toDataURL();
-      saveStickyNotesHistory();
-    }
-  });
-
-  // ドラッグ移動機能
-  let isDragging = false;
-  let dragOffsetX = 0;
-  let dragOffsetY = 0;
-
-  header.addEventListener('mousedown', (e) => {
-    isDragging = true;
-    dragOffsetX = e.clientX - note.x;
-    dragOffsetY = e.clientY - note.y;
-
-    // 最前面に移動
-    note.zIndex = Date.now();
-    noteElement.style.zIndex = note.zIndex;
-
-    e.preventDefault();
-  });
-
-  document.addEventListener('mousemove', (e) => {
-    if (!isDragging) return;
-
-    note.x = e.clientX - dragOffsetX;
-    note.y = e.clientY - dragOffsetY;
-
-    noteElement.style.left = note.x + 'px';
-    noteElement.style.top = note.y + 'px';
-  });
-
-  document.addEventListener('mouseup', () => {
-    if (isDragging) {
-      isDragging = false;
-      saveStickyNotesHistory();
-    }
-  });
-
-  // リサイズ監視
-  const resizeObserver = new ResizeObserver(entries => {
-    for (const entry of entries) {
-      const rect = entry.contentRect;
-      note.width = rect.width;
-      note.height = rect.height;
-
-      // Canvasのサイズも更新
-      const contentRect = content.getBoundingClientRect();
-      const oldData = canvas.toDataURL();
-
-      canvas.width = contentRect.width;
-      canvas.height = contentRect.height;
-
-      // 描画を復元
-      if (note.drawingData) {
-        const img = new Image();
-        img.onload = () => {
-          ctx.drawImage(img, 0, 0);
-        };
-        img.src = note.drawingData;
-      }
-
-      saveStickyNotesHistory();
-    }
-  });
-
-  resizeObserver.observe(noteElement);
-}
-
-// すべての付箋をレンダリング
-function renderAllStickyNotes() {
-  // 両方のコンテナをクリア
-  const fixedContainer = document.getElementById('sticky-notes-container');
-  const scrollContainer = document.getElementById('sticky-notes-scroll-container');
-  fixedContainer.innerHTML = '';
-  scrollContainer.innerHTML = '';
-
-  // 各付箋を適切なコンテナにレンダリング
-  stickyNotes.forEach(note => renderStickyNote(note));
-}
-
-// 付箋の履歴保存（ツリーデータと統合）
-function saveStickyNotesHistory() {
-  // 未保存フラグを立てる
-  checkUnsavedChanges();
-}
-
-// ツールバーの付箋ボタン
-document.getElementById('add-sticky-btn').addEventListener('click', () => {
-  // 画面中央に付箋を作成
-  const x = window.innerWidth / 2 - 125;
-  const y = window.innerHeight / 2 - 125;
-  addStickyNote(x, y);
-});
-
-// Ctrl+8 で付箋を追加
-document.addEventListener('keydown', (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key === '8') {
-    e.preventDefault();
-    const x = window.innerWidth / 2 - 125;
-    const y = window.innerHeight / 2 - 125;
-    addStickyNote(x, y);
   }
 });

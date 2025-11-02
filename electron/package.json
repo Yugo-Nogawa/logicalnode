@@ -6,9 +6,10 @@
   "scripts": {
     "start": "electron .",
     "build": "electron-builder",
-    "build:win": "electron-builder --win",
+    "build:win": "set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win",
     "build:mac": "electron-builder --mac",
-    "build:linux": "electron-builder --linux"
+    "build:linux": "electron-builder --linux",
+    "pack": "electron-packager . \"Logical Node 3\" --platform=win32 --arch=x64 --out=dist --overwrite --icon=assets/icons/icon.png"
   },
   "keywords": [
     "logical-node",
@@ -33,8 +34,10 @@
       "buildResources": "assets"
     },
     "win": {
-      "target": "zip",
-      "icon": "assets/icons/icon.png"
+      "target": "portable",
+      "icon": "assets/icons/icon.png",
+      "verifyUpdateCodeSignature": false,
+      "signDlls": false
     },
     "mac": {
       "target": "dmg",

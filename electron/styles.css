@@ -188,6 +188,7 @@ body {
 }
 
 #main-content {
+  position: relative;
   flex: 1;
   overflow: auto;
   padding: 2.5rem; /* 40px */
@@ -195,6 +196,7 @@ body {
 }
 
 #tree-container {
+  position: relative;
   display: flex;
   flex-direction: row;
   align-items: flex-start;
@@ -337,6 +339,42 @@ body {
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
+/* リンクモード時のソースノードのスタイル */
+.tree-node.linking-source > .node-wrapper > .node-content {
+  outline: 2px dashed #ff6600;
+  outline-offset: 2px;
+  animation: pulse-link 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-link {
+  0%, 100% {
+    outline-color: #ff6600;
+  }
+  50% {
+    outline-color: #ffaa66;
+  }
+}
+
+/* ノード間リンク線のスタイル */
+.node-link-line {
+  z-index: 5 !important;
+}
+
+.node-link-line path {
+  transition: stroke 0.2s, stroke-width 0.2s;
+}
+
+.node-link-line path:hover {
+  stroke: #0066cc !important;
+  stroke-width: 3 !important;
+}
+
+/* 付箋は常にabsoluteで、コンテナによって固定/スクロールが決まる */
+.sticky-note.fixed-mode,
+.sticky-note.scroll-mode {
+  position: absolute;
+}
+
 /* スクロールバーのスタイリング */
 ::-webkit-scrollbar {
   width: 10px;
@@ -438,4 +476,241 @@ body {
 .node-memo-input::placeholder {
   color: #bbb;
   font-size: 11px;
+}
+
+/* 付箋機能 */
+/* 固定付箋用コンテナ */
+#sticky-notes-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+/* スクロール連動付箋用コンテナ */
+#sticky-notes-scroll-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.sticky-note {
+  position: absolute;
+  background-color: #ffeb3b;
+  border: 1px solid #fbc02d;
+  border-radius: 4px;
+  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.2);
+  min-width: 200px;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  resize: both;
+  overflow: hidden;
+}
+
+/* 固定表示モードとスクロール連動モード */
+/* コンテナによって振る舞いが決まるので、クラスはマーカーとして使用 */
+/* 両方ともposition: absoluteで、親コンテナ（fixed or absolute）によって動作が決まる */
+.sticky-note.fixed-mode,
+.sticky-note.scroll-mode {
+  position: absolute;
+}
+
+.sticky-note.color-yellow {
+  background-color: #ffeb3b;
+  border-color: #fbc02d;
+}
+
+.sticky-note.color-pink {
+  background-color: #f8bbd0;
+  border-color: #f06292;
+}
+
+.sticky-note.color-blue {
+  background-color: #bbdefb;
+  border-color: #64b5f6;
+}
+
+.sticky-note.color-green {
+  background-color: #c8e6c9;
+  border-color: #81c784;
+}
+
+.sticky-note.color-orange {
+  background-color: #ffe0b2;
+  border-color: #ffb74d;
+}
+
+.sticky-note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  cursor: move;
+  user-select: none;
+}
+
+.sticky-note-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #333;
+  flex: 1;
+}
+
+.sticky-note-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.sticky-note-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 2px;
+  transition: background-color 0.15s;
+  color: #333;
+}
+
+.sticky-note-btn:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.sticky-note-btn.active {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.sticky-note-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.sticky-note-textarea {
+  flex: 1;
+  border: none;
+  background-color: transparent;
+  font-size: 12px;
+  font-family: 'Comic Sans MS', 'Segoe Print', cursive;
+  color: #333;
+  padding: 8px;
+  resize: none;
+  outline: none;
+  overflow-y: auto;
+}
+
+.sticky-note-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  pointer-events: none;
+}
+
+.sticky-note-canvas.drawing-mode {
+  pointer-events: auto;
+  z-index: 10;
+}
+
+.sticky-note-color-picker {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.sticky-color-option {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sticky-color-option:hover {
+  transform: scale(1.2);
+  border-color: rgba(0, 0, 0, 0.4);
+}
+
+.sticky-color-option.selected {
+  border-color: rgba(0, 0, 0, 0.6);
+  border-width: 3px;
+}
+
+.sticky-color-yellow {
+  background-color: #ffeb3b;
+}
+
+.sticky-color-pink {
+  background-color: #f8bbd0;
+}
+
+.sticky-color-blue {
+  background-color: #bbdefb;
+}
+
+.sticky-color-green {
+  background-color: #c8e6c9;
+}
+
+.sticky-color-orange {
+  background-color: #ffe0b2;
+}
+
+.sticky-note-drawing-controls {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  align-items: center;
+}
+
+.pen-color-btn {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.pen-color-btn:hover {
+  transform: scale(1.2);
+}
+
+.pen-color-btn.selected {
+  border-color: rgba(0, 0, 0, 0.8);
+  border-width: 3px;
+}
+
+.pen-width-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: #666;
+  margin-left: 8px;
+}
+
+.pen-width-slider {
+  width: 60px;
+  height: 4px;
 }
