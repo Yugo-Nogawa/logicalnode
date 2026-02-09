@@ -695,10 +695,10 @@ function renderNode(node) {
 
   // スタイルを適用
   if (node.bold) {
-    input.style.fontWeight = 'bold';
+    input.classList.add('node-bold');
   }
   if (node.color) {
-    input.style.color = node.color;
+    input.classList.add(`node-color-${node.color}`);
   }
 
   // テキストエリアの自動リサイズ関数
@@ -1656,7 +1656,11 @@ document.addEventListener('keydown', (e) => {
     if (nodeElement) {
       const input = nodeElement.querySelector('.node-input');
       if (input) {
-        input.style.fontWeight = focusedNode.bold ? 'bold' : 'normal';
+        if (focusedNode.bold) {
+          input.classList.add('node-bold');
+        } else {
+          input.classList.remove('node-bold');
+        }
       }
     }
     updateToolbar();
@@ -1666,6 +1670,7 @@ document.addEventListener('keydown', (e) => {
   else if ((e.ctrlKey || e.metaKey) && e.key >= '1' && e.key <= '6') {
     e.preventDefault();
     const colors = ['null', null, 'red', 'blue', 'green', 'orange', 'purple'];
+    const oldColor = focusedNode.color;
     focusedNode.color = colors[parseInt(e.key)];
     saveHistory();
 
@@ -1674,7 +1679,14 @@ document.addEventListener('keydown', (e) => {
     if (nodeElement) {
       const input = nodeElement.querySelector('.node-input');
       if (input) {
-        input.style.color = focusedNode.color || '';
+        // 古い色クラスを削除
+        if (oldColor) {
+          input.classList.remove(`node-color-${oldColor}`);
+        }
+        // 新しい色クラスを追加
+        if (focusedNode.color) {
+          input.classList.add(`node-color-${focusedNode.color}`);
+        }
       }
     }
     updateToolbar();
@@ -1812,7 +1824,11 @@ document.getElementById('bold-btn').addEventListener('click', () => {
     if (nodeElement) {
       const input = nodeElement.querySelector('.node-input');
       if (input) {
-        input.style.fontWeight = focusedNode.bold ? 'bold' : 'normal';
+        if (focusedNode.bold) {
+          input.classList.add('node-bold');
+        } else {
+          input.classList.remove('node-bold');
+        }
       }
     }
     updateToolbar();
@@ -1824,6 +1840,7 @@ document.querySelectorAll('.color-btn').forEach(btn => {
     const focusedNode = findNode(treeData, focusedNodeId);
     if (focusedNode) {
       const color = btn.dataset.color;
+      const oldColor = focusedNode.color;
       focusedNode.color = color === 'null' ? null : color;
       saveHistory();
 
@@ -1832,7 +1849,14 @@ document.querySelectorAll('.color-btn').forEach(btn => {
       if (nodeElement) {
         const input = nodeElement.querySelector('.node-input');
         if (input) {
-          input.style.color = focusedNode.color || '';
+          // 古い色クラスを削除
+          if (oldColor) {
+            input.classList.remove(`node-color-${oldColor}`);
+          }
+          // 新しい色クラスを追加
+          if (focusedNode.color) {
+            input.classList.add(`node-color-${focusedNode.color}`);
+          }
         }
       }
       updateToolbar();
