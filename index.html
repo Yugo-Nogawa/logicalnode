@@ -4,33 +4,58 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Logical Node 3</title>
+  <script>
+    (function(d) {
+      var config = {
+        kitId: 'ohk5leg',
+        scriptTimeout: 3000,
+        async: true
+      },
+      h=d.documentElement,t=setTimeout(function(){h.className=h.className.replace(/\bwf-loading\b/g,"")+" wf-inactive";},config.scriptTimeout),tk=d.createElement("script"),f=false,s=d.getElementsByTagName("script")[0],a;h.className+=" wf-loading";tk.src='https://use.typekit.net/'+config.kitId+'.js';tk.async=true;tk.onload=tk.onreadystatechange=function(){a=this.readyState;if(f||a&&a!="complete"&&a!="loaded")return;f=true;clearTimeout(t);try{Typekit.load(config)}catch(e){}};s.parentNode.insertBefore(tk,s)
+    })(document);
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div id="app">
     <div id="toolbar">
       <div class="toolbar-group">
-        <button id="add-child-btn" class="toolbar-btn" title="子ノード追加 (Tab)">子ノード</button>
-        <button id="add-sibling-btn" class="toolbar-btn" title="兄弟ノード追加 (Enter)">兄弟</button>
+        <button id="add-child-btn" class="toolbar-btn" title="子ノード追加 (Tab)">
+          <i class="fas fa-level-down-alt"></i>
+        </button>
+        <button id="add-sibling-btn" class="toolbar-btn" title="兄弟ノード追加 (Enter)">
+          <i class="fas fa-equals"></i>
+        </button>
       </div>
       <div class="toolbar-separator"></div>
       <div class="toolbar-group">
-        <button id="outdent-btn" class="toolbar-btn" title="階層を上げる (Ctrl+←)">← 上へ</button>
-        <button id="indent-btn" class="toolbar-btn" title="階層を下げる (Ctrl+→)">下へ →</button>
+        <button id="outdent-btn" class="toolbar-btn" title="階層を上げる (Ctrl+←)">
+          <i class="fas fa-arrow-left"></i>
+        </button>
+        <button id="indent-btn" class="toolbar-btn" title="階層を下げる (Ctrl+→)">
+          <i class="fas fa-arrow-right"></i>
+        </button>
       </div>
       <div class="toolbar-separator"></div>
       <div class="toolbar-group">
-        <button id="move-up-btn" class="toolbar-btn" title="順序を上げる (Ctrl+↑)">↑ 上</button>
-        <button id="move-down-btn" class="toolbar-btn" title="順序を下げる (Ctrl+↓)">↓ 下</button>
+        <button id="move-up-btn" class="toolbar-btn" title="順序を上げる (Ctrl+↑)">
+          <i class="fas fa-arrow-up"></i>
+        </button>
+        <button id="move-down-btn" class="toolbar-btn" title="順序を下げる (Ctrl+↓)">
+          <i class="fas fa-arrow-down"></i>
+        </button>
       </div>
       <div class="toolbar-separator"></div>
       <div class="toolbar-group">
-        <button id="add-memo-btn" class="toolbar-btn" title="メモ追加 (Ctrl+7)">メモ</button>
+        <button id="add-memo-btn" class="toolbar-btn" title="メモ追加 (Ctrl+7)">
+          <i class="fas fa-sticky-note"></i>
+        </button>
       </div>
       <div class="toolbar-separator"></div>
       <div class="toolbar-group">
         <button id="bold-btn" class="toolbar-btn" title="太字 (Ctrl+B)">
-          <strong>B</strong>
+          <i class="fas fa-bold"></i>
         </button>
       </div>
       <div class="toolbar-group">
