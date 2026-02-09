@@ -26,6 +26,15 @@ let savedTreeData = null;
 // 拡大縮小の基準サイズ
 const DEFAULT_FONT_SIZE = 16;
 
+// カラーマッピング
+const COLOR_MAP = {
+  'red': '#e63946',
+  'blue': '#457b9d',
+  'green': '#2a9d8f',
+  'orange': '#f4a261',
+  'purple': '#9d4edd'
+};
+
 // 履歴に状態を保存
 function saveHistory() {
   // 現在の位置より後の履歴を削除
@@ -437,7 +446,7 @@ function renderNode(node) {
     input.style.fontWeight = 'bold';
   }
   if (node.color) {
-    input.style.color = node.color;
+    input.style.color = COLOR_MAP[node.color] || node.color;
   }
 
   // テキストエリアの自動リサイズ関数
@@ -711,7 +720,14 @@ async function saveFile() {
 function loadFile(data) {
   try {
     const parsed = JSON.parse(data);
-    treeData = parsed;
+
+    // 新形式（treeDataプロパティあり）と旧形式（なし）の両方に対応
+    if (parsed.treeData) {
+      treeData = parsed.treeData;
+    } else {
+      treeData = parsed;
+    }
+
     focusedNodeId = treeData.children.length > 0 ? treeData.children[0].id : null;
 
     // ノードIDカウンターを更新
