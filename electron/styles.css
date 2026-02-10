@@ -19,11 +19,11 @@ body {
   overflow: hidden;
 
   /* カスタムカラー定義 */
-  --color-red: #dc3545;
-  --color-blue: #4285f4;
-  --color-green: #34a853;
-  --color-orange: #ff9800;
-  --color-purple: #9c27b0;
+  --color-red: #e63946;
+  --color-blue: #457b9d;
+  --color-green: #2a9d8f;
+  --color-orange: #f4a261;
+  --color-purple: #9d4edd;
 }
 
 #app {
