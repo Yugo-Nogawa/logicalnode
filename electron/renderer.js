@@ -1897,7 +1897,38 @@ document.getElementById('add-child-btn').addEventListener('click', () => {
     const newNode = createNode('');
     focusedNode.children.push(newNode);
     focusedNodeId = newNode.id;
-    renderTree(true);
+
+    // 差分更新: 親ノードの子コンテナに新ノードを追加
+    const parentElement = document.querySelector(`[data-node-id="${focusedNode.id}"]`);
+    if (parentElement) {
+      let childrenContainer = parentElement.querySelector(':scope > .node-children');
+      if (!childrenContainer) {
+        childrenContainer = document.createElement('div');
+        childrenContainer.className = 'node-children';
+        parentElement.appendChild(childrenContainer);
+        parentElement.classList.add('has-children');
+      }
+      const newNodeElement = renderNode(newNode);
+      childrenContainer.appendChild(newNodeElement);
+
+      // 接続線を再描画
+      requestAnimationFrame(() => {
+        drawConnectionsDebounced();
+        drawNodeLinks();
+      });
+
+      // フォーカスとパンくずリストを更新
+      updateFocusedNode();
+
+      // 編集モードに入る
+      setTimeout(() => {
+        const input = newNodeElement.querySelector('.node-input');
+        if (input) {
+          input.focus();
+          input.select();
+        }
+      }, 0);
+    }
   }
 });
 
@@ -1912,7 +1943,31 @@ document.getElementById('add-sibling-btn').addEventListener('click', () => {
       const newNode = createNode('');
       siblings.splice(index + 1, 0, newNode);
       focusedNodeId = newNode.id;
-      renderTree(true);
+
+      // 差分更新: 現在のノードの後に新ノードを挿入
+      const currentElement = document.querySelector(`[data-node-id="${focusedNode.id}"]`);
+      if (currentElement) {
+        const newNodeElement = renderNode(newNode);
+        currentElement.parentNode.insertBefore(newNodeElement, currentElement.nextSibling);
+
+        // 接続線を再描画
+        requestAnimationFrame(() => {
+          drawConnectionsDebounced();
+          drawNodeLinks();
+        });
+
+        // フォーカスとパンくずリストを更新
+        updateFocusedNode();
+
+        // 編集モードに入る
+        setTimeout(() => {
+          const input = newNodeElement.querySelector('.node-input');
+          if (input) {
+            input.focus();
+            input.select();
+          }
+        }, 0);
+      }
     }
   }
 });
