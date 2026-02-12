@@ -663,7 +663,58 @@ function renderNode(node) {
     node.children.push(draggedNode);
     focusedNodeId = draggedNode.id;
 
-    renderTree();
+    // 差分更新: DOM要素を移動
+    const draggedElement = document.querySelector(`[data-node-id="${draggedId}"]`);
+    const dropTargetElement = document.querySelector(`[data-node-id="${node.id}"]`);
+
+    if (draggedElement && dropTargetElement) {
+      // ドラッグ元の親から削除
+      const oldParentElement = draggedElement.parentNode.parentNode; // .node-children > .tree-node
+      draggedElement.remove();
+
+      // ドラッグ元の親の子が空になったら子コンテナを削除
+      if (oldParentElement && oldParentElement.classList && oldParentElement.classList.contains('tree-node')) {
+        const oldChildrenContainer = oldParentElement.querySelector(':scope > .node-children');
+        if (oldChildrenContainer && oldChildrenContainer.children.length === 0) {
+          oldChildrenContainer.remove();
+          oldParentElement.classList.remove('has-children');
+
+          // 折りたたみボタンを非表示に
+          const oldCollapseBtn = oldParentElement.querySelector('.collapse-btn');
+          if (oldCollapseBtn) {
+            oldCollapseBtn.style.visibility = 'hidden';
+          }
+        }
+      }
+
+      // ドロップ先の子コンテナに追加
+      let childrenContainer = dropTargetElement.querySelector(':scope > .node-children');
+      if (!childrenContainer) {
+        childrenContainer = document.createElement('div');
+        childrenContainer.className = 'node-children';
+        dropTargetElement.appendChild(childrenContainer);
+        dropTargetElement.classList.add('has-children');
+
+        // 折りたたみボタンを表示
+        const collapseBtn = dropTargetElement.querySelector('.collapse-btn');
+        if (collapseBtn) {
+          collapseBtn.textContent = '▼';
+          collapseBtn.style.visibility = 'visible';
+        }
+      }
+
+      childrenContainer.appendChild(draggedElement);
+
+      // 接続線を再描画
+      requestAnimationFrame(() => {
+        drawConnectionsDebounced();
+        drawNodeLinks();
+      });
+
+      // フォーカスを更新
+      updateFocusedNode();
+    }
+
     updateToolbar();
   });
 
@@ -677,7 +728,19 @@ function renderNode(node) {
       e.stopPropagation();
       node.collapsed = !node.collapsed;
       saveHistory();
-      renderTree();
+
+      // 差分更新: ボタンのテキストと子要素の表示/非表示を切り替え
+      collapseBtn.textContent = node.collapsed ? '▶' : '▼';
+      const childrenContainer = nodeElement.querySelector(':scope > .node-children');
+      if (childrenContainer) {
+        childrenContainer.style.display = node.collapsed ? 'none' : 'block';
+      }
+
+      // 接続線を再描画
+      requestAnimationFrame(() => {
+        drawConnectionsDebounced();
+        drawNodeLinks();
+      });
     });
   } else {
     // 子ノードがない場合は透明なスペーサーとして表示
@@ -879,10 +942,15 @@ function renderNode(node) {
 
   nodeElement.appendChild(nodeWrapper);
 
-  // 子ノードをレンダリング（折りたたまれていない場合のみ）
-  if (node.children.length > 0 && !node.collapsed) {
+  // 子ノードをレンダリング（折りたたまれている場合は非表示）
+  if (node.children.length > 0) {
     const childrenContainer = document.createElement('div');
     childrenContainer.className = 'node-children';
+
+    // 折りたたまれている場合は非表示
+    if (node.collapsed) {
+      childrenContainer.style.display = 'none';
+    }
 
     node.children.forEach(child => {
       childrenContainer.appendChild(renderNode(child));
@@ -1617,7 +1685,36 @@ document.addEventListener('keydown', (e) => {
           focusedNodeId = null;
         }
 
-        renderTree();
+        // 差分更新: DOM要素を削除
+        const elementToRemove = document.querySelector(`[data-node-id="${focusedNode.id}"]`);
+        if (elementToRemove) {
+          const parentElement = elementToRemove.parentNode.parentNode; // .node-children > .tree-node
+          elementToRemove.remove();
+
+          // 親の子が空になったら子コンテナを削除
+          if (parentElement && parentElement.classList && parentElement.classList.contains('tree-node')) {
+            const childrenContainer = parentElement.querySelector(':scope > .node-children');
+            if (childrenContainer && childrenContainer.children.length === 0) {
+              childrenContainer.remove();
+              parentElement.classList.remove('has-children');
+
+              // 折りたたみボタンを非表示に
+              const collapseBtn = parentElement.querySelector('.collapse-btn');
+              if (collapseBtn) {
+                collapseBtn.style.visibility = 'hidden';
+              }
+            }
+          }
+
+          // 接続線を再描画
+          requestAnimationFrame(() => {
+            drawConnectionsDebounced();
+            drawNodeLinks();
+          });
+
+          // フォーカスを更新
+          updateFocusedNode();
+        }
       }
     }
   }
@@ -1779,7 +1876,37 @@ document.addEventListener('keydown', (e) => {
         focusedNodeId = null;
       }
 
-      renderTree();
+      // 差分更新: DOM要素を削除
+      const elementToRemove = document.querySelector(`[data-node-id="${focusedNode.id}"]`);
+      if (elementToRemove) {
+        const parentElement = elementToRemove.parentNode.parentNode; // .node-children > .tree-node
+        elementToRemove.remove();
+
+        // 親の子が空になったら子コンテナを削除
+        if (parentElement && parentElement.classList && parentElement.classList.contains('tree-node')) {
+          const childrenContainer = parentElement.querySelector(':scope > .node-children');
+          if (childrenContainer && childrenContainer.children.length === 0) {
+            childrenContainer.remove();
+            parentElement.classList.remove('has-children');
+
+            // 折りたたみボタンを非表示に
+            const collapseBtn = parentElement.querySelector('.collapse-btn');
+            if (collapseBtn) {
+              collapseBtn.style.visibility = 'hidden';
+            }
+          }
+        }
+
+        // 接続線を再描画
+        requestAnimationFrame(() => {
+          drawConnectionsDebounced();
+          drawNodeLinks();
+        });
+
+        // フォーカスを更新
+        updateFocusedNode();
+      }
+
       updateToolbar();
       console.log('ノードをカットしました');
     }
@@ -1986,7 +2113,40 @@ document.getElementById('outdent-btn').addEventListener('click', () => {
 
         const parentIndex = grandParent.children.findIndex(n => n.id === parent.id);
         grandParent.children.splice(parentIndex + 1, 0, focusedNode);
-        renderTree();
+
+        // 差分更新: DOM要素を祖父要素の子として移動
+        const currentElement = document.querySelector(`[data-node-id="${focusedNode.id}"]`);
+        const parentElement = document.querySelector(`[data-node-id="${parent.id}"]`);
+
+        if (currentElement && parentElement) {
+          // 現在の要素を親から削除し、祖父要素の子として挿入
+          const grandParentElement = parentElement.parentNode.parentNode; // .node-children > .tree-node
+
+          if (grandParentElement) {
+            // 親要素の次の兄弟として挿入
+            grandParentElement.insertBefore(currentElement, parentElement.nextSibling);
+
+            // 親の子が空になったら子コンテナを削除
+            const parentChildrenContainer = parentElement.querySelector(':scope > .node-children');
+            if (parentChildrenContainer && parentChildrenContainer.children.length === 0) {
+              parentChildrenContainer.remove();
+              parentElement.classList.remove('has-children');
+
+              // 折りたたみボタンを非表示に
+              const collapseBtn = parentElement.querySelector('.collapse-btn');
+              if (collapseBtn) {
+                collapseBtn.style.visibility = 'hidden';
+              }
+            }
+
+            // 接続線を再描画
+            requestAnimationFrame(() => {
+              drawConnectionsDebounced();
+              drawNodeLinks();
+            });
+          }
+        }
+
         updateToolbar();
       }
     }
@@ -2005,7 +2165,38 @@ document.getElementById('indent-btn').addEventListener('click', () => {
         const prevSibling = siblings[index - 1];
         siblings.splice(index, 1);
         prevSibling.children.push(focusedNode);
-        renderTree();
+
+        // 差分更新: DOM要素を前の兄弟の子コンテナに移動
+        const currentElement = document.querySelector(`[data-node-id="${focusedNode.id}"]`);
+        const prevSiblingElement = document.querySelector(`[data-node-id="${prevSibling.id}"]`);
+
+        if (currentElement && prevSiblingElement) {
+          // 前の兄弟要素から子コンテナを取得または作成
+          let childrenContainer = prevSiblingElement.querySelector(':scope > .node-children');
+          if (!childrenContainer) {
+            childrenContainer = document.createElement('div');
+            childrenContainer.className = 'node-children';
+            prevSiblingElement.appendChild(childrenContainer);
+            prevSiblingElement.classList.add('has-children');
+
+            // 折りたたみボタンを更新
+            const collapseBtn = prevSiblingElement.querySelector('.collapse-btn');
+            if (collapseBtn) {
+              collapseBtn.textContent = '▼';
+              collapseBtn.style.visibility = 'visible';
+            }
+          }
+
+          // 現在の要素を移動
+          childrenContainer.appendChild(currentElement);
+
+          // 接続線を再描画
+          requestAnimationFrame(() => {
+            drawConnectionsDebounced();
+            drawNodeLinks();
+          });
+        }
+
         updateToolbar();
       }
     }
@@ -2022,7 +2213,20 @@ document.getElementById('move-up-btn').addEventListener('click', () => {
       if (index > 0) {
         saveHistory();
         [siblings[index - 1], siblings[index]] = [siblings[index], siblings[index - 1]];
-        renderTree();
+
+        // 差分更新: DOM要素の順序を入れ替え
+        const currentElement = document.querySelector(`[data-node-id="${focusedNode.id}"]`);
+        const prevElement = currentElement.previousElementSibling;
+        if (currentElement && prevElement) {
+          currentElement.parentNode.insertBefore(currentElement, prevElement);
+
+          // 接続線を再描画
+          requestAnimationFrame(() => {
+            drawConnectionsDebounced();
+            drawNodeLinks();
+          });
+        }
+
         updateToolbar();
       }
     }
@@ -2039,7 +2243,20 @@ document.getElementById('move-down-btn').addEventListener('click', () => {
       if (index < siblings.length - 1) {
         saveHistory();
         [siblings[index], siblings[index + 1]] = [siblings[index + 1], siblings[index]];
-        renderTree();
+
+        // 差分更新: DOM要素の順序を入れ替え
+        const currentElement = document.querySelector(`[data-node-id="${focusedNode.id}"]`);
+        const nextElement = currentElement.nextElementSibling;
+        if (currentElement && nextElement) {
+          currentElement.parentNode.insertBefore(nextElement, currentElement);
+
+          // 接続線を再描画
+          requestAnimationFrame(() => {
+            drawConnectionsDebounced();
+            drawNodeLinks();
+          });
+        }
+
         updateToolbar();
       }
     }
