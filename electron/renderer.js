@@ -731,9 +731,33 @@ function renderNode(node) {
 
       // 差分更新: ボタンのテキストと子要素の表示/非表示を切り替え
       collapseBtn.textContent = node.collapsed ? '▶' : '▼';
-      const childrenContainer = nodeElement.querySelector(':scope > .node-children');
-      if (childrenContainer) {
-        childrenContainer.style.display = node.collapsed ? 'none' : 'block';
+
+      // ボタンの親ノードから子コンテナを取得
+      const parentNodeElement = e.target.closest('.tree-node');
+      if (parentNodeElement) {
+        const childrenContainer = parentNodeElement.querySelector(':scope > .node-children');
+        if (childrenContainer) {
+          childrenContainer.style.display = node.collapsed ? 'none' : 'block';
+
+          // 展開時：子孫ノードのtextareaの高さを再計算
+          if (!node.collapsed) {
+            requestAnimationFrame(() => {
+              const textareas = childrenContainer.querySelectorAll('.node-input, .node-memo-input');
+              textareas.forEach(textarea => {
+                textarea.style.height = 'auto';
+                textarea.style.height = textarea.scrollHeight + 'px';
+              });
+            });
+          }
+        } else if (!node.collapsed && node.children.length > 0) {
+          // 子コンテナが存在しない場合は作成（通常は起こらないはず）
+          const newChildrenContainer = document.createElement('div');
+          newChildrenContainer.className = 'node-children';
+          node.children.forEach(child => {
+            newChildrenContainer.appendChild(renderNode(child));
+          });
+          parentNodeElement.appendChild(newChildrenContainer);
+        }
       }
 
       // 接続線を再描画
@@ -2034,7 +2058,25 @@ document.getElementById('add-child-btn').addEventListener('click', () => {
         childrenContainer.className = 'node-children';
         parentElement.appendChild(childrenContainer);
         parentElement.classList.add('has-children');
+
+        // 折りたたみボタンを更新
+        const collapseBtn = parentElement.querySelector('.collapse-btn');
+        if (collapseBtn) {
+          collapseBtn.textContent = focusedNode.collapsed ? '▶' : '▼';
+          collapseBtn.style.visibility = 'visible';
+        }
       }
+
+      // 親が折りたたまれている場合は展開する
+      if (focusedNode.collapsed) {
+        focusedNode.collapsed = false;
+        childrenContainer.style.display = 'block';
+        const collapseBtn = parentElement.querySelector('.collapse-btn');
+        if (collapseBtn) {
+          collapseBtn.textContent = '▼';
+        }
+      }
+
       const newNodeElement = renderNode(newNode);
       childrenContainer.appendChild(newNodeElement);
 
