@@ -91,10 +91,199 @@ function redo() {
 function restoreFromHistory() {
   if (historyIndex >= 0 && historyIndex < history.length) {
     const snapshot = history[historyIndex];
+    const oldTreeData = treeData;
     treeData = JSON.parse(JSON.stringify(snapshot.treeData));
     focusedNodeId = snapshot.focusedNodeId;
     nodeIdCounter = snapshot.nodeIdCounter;
-    renderTree(false);
+
+    // 差分更新を試みる
+    const success = updateTreeIncrementally(oldTreeData, treeData);
+
+    if (!success) {
+      // フォールバック: 全体を再描画
+      renderTree(false);
+    } else {
+      // フォーカスとパンくずリストを更新
+      updateFocusedNode();
+
+      // 接続線を再描画
+      requestAnimationFrame(() => {
+        drawConnectionsDebounced();
+        drawNodeLinks();
+      });
+    }
+  }
+}
+
+// ツリーを増分的に更新
+function updateTreeIncrementally(oldTree, newTree) {
+  try {
+    const container = document.getElementById('tree-container');
+    if (!container) return false;
+
+    // ノードIDのマップを作成
+    const oldNodesMap = new Map();
+    const newNodesMap = new Map();
+
+    function collectNodes(node, map) {
+      map.set(node.id, node);
+      if (node.children) {
+        node.children.forEach(child => collectNodes(child, map));
+      }
+    }
+
+    oldTree.children.forEach(child => collectNodes(child, oldNodesMap));
+    newTree.children.forEach(child => collectNodes(child, newNodesMap));
+
+    // 削除されたノードをDOMから削除
+    oldNodesMap.forEach((node, id) => {
+      if (!newNodesMap.has(id)) {
+        const element = document.querySelector(`[data-node-id="${id}"]`);
+        if (element) {
+          element.remove();
+        }
+      }
+    });
+
+    // 新しいノードを追加し、既存のノードを更新
+    function updateNodeRecursively(newNode, parentElement, index) {
+      const existingElement = document.querySelector(`[data-node-id="${newNode.id}"]`);
+      const oldNode = oldNodesMap.get(newNode.id);
+
+      if (!existingElement) {
+        // 新しいノードを作成
+        const newElement = renderNode(newNode);
+
+        // 正しい位置に挿入
+        const children = Array.from(parentElement.children);
+        if (index < children.length) {
+          parentElement.insertBefore(newElement, children[index]);
+        } else {
+          parentElement.appendChild(newElement);
+        }
+      } else {
+        // 既存のノードを更新
+        if (oldNode) {
+          // テキストが変更された場合
+          if (oldNode.text !== newNode.text) {
+            const input = existingElement.querySelector('.node-input');
+            if (input && input !== document.activeElement) {
+              input.value = newNode.text;
+              // テキストエリアの高さを再計算
+              input.style.height = 'auto';
+              input.style.height = input.scrollHeight + 'px';
+            }
+          }
+
+          // 太字が変更された場合
+          if (oldNode.bold !== newNode.bold) {
+            const input = existingElement.querySelector('.node-input');
+            if (input) {
+              if (newNode.bold) {
+                input.classList.add('bold');
+              } else {
+                input.classList.remove('bold');
+              }
+            }
+          }
+
+          // 色が変更された場合
+          if (oldNode.color !== newNode.color) {
+            const input = existingElement.querySelector('.node-input');
+            if (input) {
+              // 古い色クラスを削除
+              input.classList.remove('color-red', 'color-blue', 'color-green', 'color-yellow', 'color-purple', 'color-pink', 'color-orange', 'color-gray');
+              // 新しい色クラスを追加
+              if (newNode.color) {
+                input.classList.add(`color-${newNode.color}`);
+              }
+            }
+          }
+
+          // 折りたたみ状態が変更された場合
+          if (oldNode.collapsed !== newNode.collapsed) {
+            const collapseBtn = existingElement.querySelector('.collapse-btn');
+            const childrenContainer = existingElement.querySelector(':scope > .node-children');
+            if (collapseBtn) {
+              collapseBtn.textContent = newNode.collapsed ? '▶' : '▼';
+            }
+            if (childrenContainer) {
+              childrenContainer.style.display = newNode.collapsed ? 'none' : 'block';
+            }
+          }
+        }
+
+        // 位置が変更された場合は移動
+        const currentIndex = Array.from(parentElement.children).indexOf(existingElement);
+        if (currentIndex !== index) {
+          const children = Array.from(parentElement.children);
+          if (index < children.length) {
+            parentElement.insertBefore(existingElement, children[index]);
+          } else {
+            parentElement.appendChild(existingElement);
+          }
+        }
+
+        // 子ノードの処理
+        let childrenContainer = existingElement.querySelector(':scope > .node-children');
+
+        if (newNode.children && newNode.children.length > 0) {
+          // 子コンテナが必要
+          if (!childrenContainer) {
+            childrenContainer = document.createElement('div');
+            childrenContainer.className = 'node-children';
+            existingElement.appendChild(childrenContainer);
+            existingElement.classList.add('has-children');
+
+            const collapseBtn = existingElement.querySelector('.collapse-btn');
+            if (collapseBtn) {
+              collapseBtn.textContent = newNode.collapsed ? '▶' : '▼';
+              collapseBtn.style.visibility = 'visible';
+            }
+          }
+
+          // 子ノードを再帰的に更新
+          newNode.children.forEach((child, i) => {
+            updateNodeRecursively(child, childrenContainer, i);
+          });
+
+          // 余分な子ノードを削除
+          const childElements = Array.from(childrenContainer.children);
+          for (let i = newNode.children.length; i < childElements.length; i++) {
+            childElements[i].remove();
+          }
+        } else {
+          // 子ノードが不要になった場合は削除
+          if (childrenContainer) {
+            childrenContainer.remove();
+            existingElement.classList.remove('has-children');
+
+            const collapseBtn = existingElement.querySelector('.collapse-btn');
+            if (collapseBtn) {
+              collapseBtn.style.visibility = 'hidden';
+            }
+          }
+        }
+      }
+    }
+
+    // ルートレベルのノードを更新
+    newTree.children.forEach((child, index) => {
+      updateNodeRecursively(child, container, index);
+    });
+
+    // 余分なルートノードを削除
+    const rootElements = Array.from(container.children).filter(el =>
+      el.classList.contains('tree-node')
+    );
+    for (let i = newTree.children.length; i < rootElements.length; i++) {
+      rootElements[i].remove();
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Incremental update failed:', error);
+    return false;
   }
 }
 
@@ -543,6 +732,70 @@ function renderTree(shouldEnterEditMode = false) {
       }
     }, 0);
   }
+}
+
+// 兄弟ノードを増分的にDOMに追加
+function addSiblingNodeToDOM(newNode, referenceNode, insertAfter = true) {
+  const referenceElement = document.querySelector(`[data-node-id="${referenceNode.id}"]`);
+  if (!referenceElement) return false;
+
+  const newNodeElement = renderNode(newNode);
+
+  if (insertAfter) {
+    // 参照ノードの後に挿入
+    referenceElement.parentNode.insertBefore(newNodeElement, referenceElement.nextSibling);
+  } else {
+    // 参照ノードの前に挿入
+    referenceElement.parentNode.insertBefore(newNodeElement, referenceElement);
+  }
+
+  // 接続線を再描画
+  requestAnimationFrame(() => {
+    drawConnectionsDebounced();
+    drawNodeLinks();
+  });
+
+  // フォーカスを更新
+  updateFocusedNode();
+
+  return true;
+}
+
+// 子ノードを増分的にDOMに追加
+function addChildNodeToDOM(newNode, parentNode) {
+  const parentElement = document.querySelector(`[data-node-id="${parentNode.id}"]`);
+  if (!parentElement) return false;
+
+  const newNodeElement = renderNode(newNode);
+
+  // 子コンテナを取得または作成
+  let childrenContainer = parentElement.querySelector(':scope > .node-children');
+  if (!childrenContainer) {
+    childrenContainer = document.createElement('div');
+    childrenContainer.className = 'node-children';
+    parentElement.appendChild(childrenContainer);
+    parentElement.classList.add('has-children');
+
+    // 折りたたみボタンを表示
+    const collapseBtn = parentElement.querySelector('.collapse-btn');
+    if (collapseBtn) {
+      collapseBtn.textContent = '▼';
+      collapseBtn.style.visibility = 'visible';
+    }
+  }
+
+  childrenContainer.appendChild(newNodeElement);
+
+  // 接続線を再描画
+  requestAnimationFrame(() => {
+    drawConnectionsDebounced();
+    drawNodeLinks();
+  });
+
+  // フォーカスを更新
+  updateFocusedNode();
+
+  return true;
 }
 
 // 個別のノードをレンダリング
@@ -1099,7 +1352,27 @@ function handleKeyPress(e, node) {
         const insertIndex = e.shiftKey ? index : index + 1;
         siblings.splice(insertIndex, 0, newNode);
         focusedNodeId = newNode.id;
-        renderTree(true); // 編集モードで作成
+
+        // 差分更新: DOMに新しいノードを追加
+        const success = addSiblingNodeToDOM(newNode, node, !e.shiftKey);
+
+        if (success) {
+          // 編集モードに入る
+          setTimeout(() => {
+            const focusedElement = document.querySelector(`[data-node-id="${focusedNodeId}"]`);
+            if (focusedElement) {
+              const input = focusedElement.querySelector('.node-input');
+              if (input) {
+                input.readOnly = false;
+                input.focus();
+                input.setSelectionRange(input.value.length, input.value.length);
+              }
+            }
+          }, 0);
+        } else {
+          // フォールバック: 全体を再描画
+          renderTree(true);
+        }
       }
     }, 0);
   }
@@ -1122,7 +1395,27 @@ function handleKeyPress(e, node) {
       const newNode = createNode('');
       node.children.push(newNode);
       focusedNodeId = newNode.id;
-      renderTree(true); // 自動フォーカス有効
+
+      // 差分更新: DOMに新しい子ノードを追加
+      const success = addChildNodeToDOM(newNode, node);
+
+      if (success) {
+        // 編集モードに入る
+        setTimeout(() => {
+          const focusedElement = document.querySelector(`[data-node-id="${focusedNodeId}"]`);
+          if (focusedElement) {
+            const input = focusedElement.querySelector('.node-input');
+            if (input) {
+              input.readOnly = false;
+              input.focus();
+              input.setSelectionRange(input.value.length, input.value.length);
+            }
+          }
+        }, 0);
+      } else {
+        // フォールバック: 全体を再描画
+        renderTree(true);
+      }
     }, 0);
   }
 
@@ -1647,7 +1940,27 @@ document.addEventListener('keydown', (e) => {
       const newNode = createNode('');
       focusedNode.children.push(newNode);
       focusedNodeId = newNode.id;
-      renderTree(true); // 自動フォーカス有効
+
+      // 差分更新: DOMに新しい子ノードを追加
+      const success = addChildNodeToDOM(newNode, focusedNode);
+
+      if (success) {
+        // 編集モードに入る
+        setTimeout(() => {
+          const focusedElement = document.querySelector(`[data-node-id="${focusedNodeId}"]`);
+          if (focusedElement) {
+            const input = focusedElement.querySelector('.node-input');
+            if (input) {
+              input.readOnly = false;
+              input.focus();
+              input.setSelectionRange(input.value.length, input.value.length);
+            }
+          }
+        }, 0);
+      } else {
+        // フォールバック: 全体を再描画
+        renderTree(true);
+      }
     }, 0);
   }
 

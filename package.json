@@ -6,6 +6,7 @@
   "scripts": {
     "start": "electron .",
     "build": "electron-builder",
+    "build:dir": "electron-builder --dir",
     "cap:sync": "npx cap sync",
     "cap:open:ios": "npx cap open ios",
     "cap:run:ios": "npx cap run ios",
