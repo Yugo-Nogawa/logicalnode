@@ -2,7 +2,7 @@
   "name": "logical-node-3",
   "version": "1.0.0",
   "description": "Logical Node 3 - A simple and focused logic tree tool",
-  "main": "main.js",
+  "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder",
@@ -37,12 +37,12 @@
     "appId": "com.logicalnode3.app",
     "productName": "Logical Node 3",
     "files": [
-      "**/*",
+      "electron/**/*",
       "!node_modules/**/*",
       "!generate-icon.js"
     ],
     "directories": {
-      "buildResources": "assets"
+      "buildResources": "electron/assets"
     },
     "win": {
       "target": "zip",
