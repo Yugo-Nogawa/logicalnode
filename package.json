@@ -5,8 +5,10 @@
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder",
-    "build:dir": "electron-builder --dir",
+    "build": "cd electron && electron-builder",
+    "build:dir": "cd electron && electron-builder --dir",
+    "electron:dev": "cd electron && npm start",
+    "electron:build": "cd electron && npm run build",
     "cap:sync": "npx cap sync",
     "cap:open:ios": "npx cap open ios",
     "cap:run:ios": "npx cap run ios",
@@ -32,32 +34,6 @@
     "electron-packager": "^17.1.2",
     "icon-gen": "^5.0.0",
     "sharp": "^0.34.4"
-  },
-  "build": {
-    "appId": "com.logicalnode3.app",
-    "productName": "Logical Node 3",
-    "files": [
-      "electron/**/*",
-      "!node_modules/**/*",
-      "!generate-icon.js"
-    ],
-    "directories": {
-      "buildResources": "electron/assets"
-    },
-    "win": {
-      "target": "zip",
-      "icon": "assets/icons/icon.png"
-    },
-    "mac": {
-      "target": "dmg",
-      "icon": "assets/icons/icon.png",
-      "category": "public.app-category.productivity"
-    },
-    "linux": {
-      "target": "AppImage",
-      "icon": "assets/icons/icon.png",
-      "category": "Utility"
-    }
   },
   "dependencies": {
     "@capacitor/cli": "^7.4.4",
