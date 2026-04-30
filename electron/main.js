@@ -112,7 +112,8 @@ function createWindow(filePath = null) {
           label: 'Open',
           accelerator: 'CmdOrCtrl+O',
           click: async () => {
-            const result = await dialog.showOpenDialog(mainWindow, {
+            const focusedWindow = BrowserWindow.getFocusedWindow() || mainWindow;
+            const result = await dialog.showOpenDialog(focusedWindow, {
               properties: ['openFile'],
               filters: [
                 { name: 'Logic Tree Files', extensions: ['tree'] },
@@ -126,7 +127,7 @@ function createWindow(filePath = null) {
                 const data = await fs.readFile(result.filePaths[0], 'utf8');
                 currentFilePath = result.filePaths[0]; // ファイルパスを記憶
                 addToRecentFiles(result.filePaths[0]); // 最近開いたファイルに追加
-                mainWindow.webContents.send('load-file', data);
+                focusedWindow.webContents.send('load-file', data);
               } catch (err) {
                 dialog.showErrorBox('Error', 'Failed to open file: ' + err.message);
               }
