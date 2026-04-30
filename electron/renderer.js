@@ -798,6 +798,89 @@ function addChildNodeToDOM(newNode, parentNode) {
   return true;
 }
 
+// 複数ノードを増分的にDOM上で移動（treeData側のミューテーション完了後に呼ぶ）
+// 並びは targetParent.children 上で nodesToMove が連続して並んでいる前提
+function moveNodesInDOM(nodesToMove, targetParent) {
+  if (!nodesToMove || nodesToMove.length === 0) return;
+
+  // 移動後のアンカー（最後に移動したノードの直後の兄弟）を取得
+  const lastMovedId = nodesToMove[nodesToMove.length - 1].id;
+  const lastIdx = targetParent.children.findIndex(n => n.id === lastMovedId);
+  const anchorNode = (lastIdx >= 0 && lastIdx + 1 < targetParent.children.length)
+    ? targetParent.children[lastIdx + 1]
+    : null;
+  const anchorElement = anchorNode
+    ? document.querySelector(`[data-node-id="${anchorNode.id}"]`)
+    : null;
+
+  // 移動先コンテナを解決（必要なら子コンテナを作成）
+  let targetContainer;
+  if (targetParent.id === 'root') {
+    targetContainer = document.getElementById('tree-container');
+  } else {
+    const targetParentElement = document.querySelector(`[data-node-id="${targetParent.id}"]`);
+    if (!targetParentElement) return;
+    targetContainer = targetParentElement.querySelector(':scope > .node-children');
+    if (!targetContainer) {
+      targetContainer = document.createElement('div');
+      targetContainer.className = 'node-children';
+      targetParentElement.appendChild(targetContainer);
+      targetParentElement.classList.add('has-children');
+      const collapseBtn = targetParentElement.querySelector('.collapse-btn');
+      if (collapseBtn) {
+        collapseBtn.textContent = '▼';
+        collapseBtn.style.visibility = 'visible';
+      }
+    }
+  }
+
+  // 移動元の親要素（後で空チェックするため収集）
+  const oldParentEls = new Set();
+
+  for (const node of nodesToMove) {
+    const el = document.querySelector(`[data-node-id="${node.id}"]`);
+    if (!el) continue;
+
+    const oldChildrenContainer = el.parentElement;
+    if (oldChildrenContainer
+        && oldChildrenContainer !== targetContainer
+        && oldChildrenContainer.classList
+        && oldChildrenContainer.classList.contains('node-children')) {
+      const oldParentEl = oldChildrenContainer.parentElement;
+      if (oldParentEl && oldParentEl.classList.contains('tree-node')) {
+        oldParentEls.add(oldParentEl);
+      }
+    }
+
+    if (anchorElement) {
+      targetContainer.insertBefore(el, anchorElement);
+    } else {
+      targetContainer.appendChild(el);
+    }
+  }
+
+  // 空になった旧親の子コンテナを片付け
+  oldParentEls.forEach(oldParentEl => {
+    const oldChildrenContainer = oldParentEl.querySelector(':scope > .node-children');
+    if (oldChildrenContainer && oldChildrenContainer.children.length === 0) {
+      oldChildrenContainer.remove();
+      oldParentEl.classList.remove('has-children');
+      const collapseBtn = oldParentEl.querySelector('.collapse-btn');
+      if (collapseBtn) {
+        collapseBtn.style.visibility = 'hidden';
+      }
+    }
+  });
+
+  // 接続線を再描画
+  requestAnimationFrame(() => {
+    drawConnectionsDebounced();
+    drawNodeLinks();
+  });
+
+  updateFocusedNode();
+}
+
 // 個別のノードをレンダリング
 function renderNode(node) {
   const nodeElement = document.createElement('div');
@@ -1573,6 +1656,14 @@ document.addEventListener('keydown', (e) => {
     return;
   }
 
+  // Ctrl+矢印（ノード移動）のキーリピートを無視
+  if (e.repeat && (e.ctrlKey || e.metaKey)
+      && (e.key === 'ArrowUp' || e.key === 'ArrowDown'
+          || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+    e.preventDefault();
+    return;
+  }
+
   // ArrowUp: 前のノードへ移動 or Ctrl+ArrowUp: ノードを上に移動
   if (e.key === 'ArrowUp') {
     e.preventDefault();
@@ -1637,10 +1728,11 @@ document.addEventListener('keydown', (e) => {
         }
       });
 
-      // 移動先の親に一括挿入
-      targetParent.children.splice(targetIndex, 0, ...nodesToMove);
+      // 移動先の親に一括挿入（削除でインデックスがずれている可能性があるので再計算）
+      const insertIndex = targetParent.children.findIndex(n => n.id === prevNode.id);
+      targetParent.children.splice(insertIndex >= 0 ? insertIndex : targetIndex, 0, ...nodesToMove);
 
-      renderTree();
+      moveNodesInDOM(nodesToMove, targetParent);
       updateToolbar();
     } else if (e.shiftKey) {
       // Shift + ArrowUp: 範囲選択を拡張
@@ -1732,10 +1824,11 @@ document.addEventListener('keydown', (e) => {
         }
       });
 
-      // 移動先の親に挿入（次のノードの後ろに）
-      targetParent.children.splice(targetIndex + 1, 0, ...nodesToMove);
+      // 移動先の親に挿入（次のノードの後ろに、削除でずれた位置を再計算）
+      const insertIndex = targetParent.children.findIndex(n => n.id === nextNode.id);
+      targetParent.children.splice((insertIndex >= 0 ? insertIndex : targetIndex) + 1, 0, ...nodesToMove);
 
-      renderTree();
+      moveNodesInDOM(nodesToMove, targetParent);
       updateToolbar();
     } else if (e.shiftKey) {
       // Shift + ArrowDown: 範囲選択を拡張
@@ -1824,7 +1917,7 @@ document.addEventListener('keydown', (e) => {
           // 前の兄弟の子として追加
           prevSibling.children.push(...nodesToMove);
 
-          renderTree();
+          moveNodesInDOM(nodesToMove, prevSibling);
           updateToolbar();
         }
       }
@@ -1893,9 +1986,10 @@ document.addEventListener('keydown', (e) => {
             }
           });
 
-          // 祖父ノードの子として追加（親の後ろに）
-          grandParent.children.splice(parentIndex + 1, 0, ...nodesToMove);
-          renderTree();
+          // 祖父ノードの子として追加（親の後ろに、削除でずれた位置を再計算）
+          const newParentIndex = grandParent.children.findIndex(n => n.id === parent.id);
+          grandParent.children.splice((newParentIndex >= 0 ? newParentIndex : parentIndex) + 1, 0, ...nodesToMove);
+          moveNodesInDOM(nodesToMove, grandParent);
           updateToolbar();
         }
       }
