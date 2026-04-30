@@ -9,7 +9,9 @@
     "build:win": "set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win",
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux",
-    "pack": "electron-packager . \"Logical Node 3\" --platform=win32 --arch=x64 --out=dist --overwrite --icon=assets/icons/icon.png"
+    "pack": "electron-packager . \"Logical Node 3\" --platform=win32 --arch=x64 --out=dist --overwrite --icon=assets/icons/icon.png",
+    "test": "npx playwright test",
+    "test:headed": "npx playwright test --headed"
   },
   "keywords": [
     "logical-node",
@@ -20,8 +22,10 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^28.0.0",
-    "electron-builder": "^24.9.0"
+    "@playwright/test": "^1.58.2",
+    "electron": "^28.3.3",
+    "electron-builder": "^24.9.0",
+    "playwright": "^1.58.2"
   },
   "build": {
     "appId": "com.logicalnode3.app",
@@ -34,7 +38,7 @@
       "buildResources": "assets"
     },
     "win": {
-      "target": "portable",
+      "target": "dir",
       "icon": "assets/icons/icon.png",
       "verifyUpdateCodeSignature": false,
       "signDlls": false
