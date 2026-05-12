@@ -1647,8 +1647,23 @@ document.addEventListener('keydown', (e) => {
     return;
   }
 
+  const isArrowKey = e.key === 'ArrowUp' || e.key === 'ArrowDown'
+      || e.key === 'ArrowLeft' || e.key === 'ArrowRight';
+
   const focusedNode = findNode(treeData, focusedNodeId);
-  if (!focusedNode) return;
+  if (!focusedNode) {
+    // フォーカスが失われている時でも矢印キーによる画面スクロールを抑止し、
+    // ツリーにノードがあれば先頭にフォーカスを復帰させる
+    if (isArrowKey) {
+      e.preventDefault();
+      if (treeData.children.length > 0) {
+        focusedNodeId = treeData.children[0].id;
+        updateFocusedNode();
+        updateToolbar();
+      }
+    }
+    return;
+  }
 
   // ノード追加系のキーはリピートを無視
   if (e.repeat && (e.key === 'Enter' || e.key === 'Tab' || e.key === 'Delete')) {
