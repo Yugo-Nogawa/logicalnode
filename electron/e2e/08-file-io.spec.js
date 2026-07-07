@@ -201,6 +201,21 @@ test.describe('File Save/Load', () => {
     expect(version).toBe(1);
   });
 
+  test('should flag unsaved changes after typing in a brand-new (Untitled) document', async () => {
+    // 起動直後（Untitled・未保存）は変更なし
+    let dirty = await window.evaluate(() => window.hasUnsavedChanges);
+    expect(dirty).toBe(false);
+
+    // 何か入力する
+    await typeIntoNode(window, 'unsaved work');
+    await window.keyboard.press('Escape');
+    await window.waitForTimeout(300);
+
+    // 新規ドキュメントでも入力後は未保存として検知される（閉じる時に警告される）
+    dirty = await window.evaluate(() => window.hasUnsavedChanges);
+    expect(dirty).toBe(true);
+  });
+
   test('should reject a corrupted file without clobbering current data', async () => {
     // 既存データを用意
     await typeIntoNode(window, 'Keep me');

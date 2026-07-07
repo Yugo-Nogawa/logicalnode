@@ -1691,6 +1691,12 @@ function newFile() {
 
   renderTree();
   renderAllStickyNotes();
+
+  // 初期状態（空ノード1つ）を保存済み基準に。以降のノード入力・付箋・リンクの変更は
+  // 未保存として検知され、閉じる時に警告される。
+  savedDocumentSnapshot = documentSnapshot();
+  window.hasUnsavedChanges = false;
+  ipcRenderer.invoke('update-window-title', false);
 }
 
 // グローバルキーボードイベント（選択モード用）
@@ -2803,8 +2809,9 @@ renderTree(true);
 // 初期状態を履歴に保存
 saveHistory();
 
-// 初期状態を保存済みとしてマーク（新規ファイルなので未保存フラグはfalse）
-savedDocumentSnapshot = null;
+// 初期状態（空ノード1つ）を保存済み基準としてマーク。
+// これ以降のノード入力・付箋・リンクの変更は未保存として検知され、閉じる時に警告される。
+savedDocumentSnapshot = documentSnapshot();
 window.hasUnsavedChanges = false;
 
 // 初期ツールバー状態を更新
