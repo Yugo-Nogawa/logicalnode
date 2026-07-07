@@ -6,10 +6,11 @@
   "scripts": {
     "start": "electron .",
     "build": "electron-builder",
-    "build:win": "set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win",
+    "build:win": "set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win && node apply-win-icon.js",
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux",
-    "pack": "electron-packager . \"Logical Node 3\" --platform=win32 --arch=x64 --out=dist --overwrite --icon=assets/icons/icon.png",
+    "pack": "electron-packager . \"Logical Node 3\" --platform=win32 --arch=x64 --out=dist --overwrite --icon=assets/icons/icon.ico",
+    "pack:mac": "electron-packager . \"Logical Node 3\" --platform=darwin --arch=arm64,x64 --out=dist --overwrite --icon=assets/icons/icon.icns",
     "test": "npx playwright test",
     "test:headed": "npx playwright test --headed"
   },
@@ -25,6 +26,7 @@
     "@playwright/test": "^1.58.2",
     "electron": "^28.3.3",
     "electron-builder": "^24.9.0",
+    "electron-packager": "^17.1.2",
     "playwright": "^1.58.2"
   },
   "build": {
@@ -39,13 +41,13 @@
     },
     "win": {
       "target": "dir",
-      "icon": "assets/icons/icon.png",
+      "icon": "assets/icons/icon.ico",
       "verifyUpdateCodeSignature": false,
       "signDlls": false
     },
     "mac": {
       "target": "dmg",
-      "icon": "assets/icons/icon.png",
+      "icon": "assets/icons/icon.icns",
       "category": "public.app-category.productivity"
     },
     "linux": {
