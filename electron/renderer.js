@@ -1642,19 +1642,36 @@ function newFile() {
 
 // グローバルキーボードイベント（選択モード用）
 document.addEventListener('keydown', (e) => {
-  // 入力中（編集モード）は無視
-  if (document.activeElement.tagName === 'TEXTAREA') {
+  // テキスト編集中（編集可能な入力欄にフォーカスがある）場合は、
+  // Enter/Tab/Escape や標準のテキスト編集（Ctrl+Z 等）を各入力欄側に任せる。
+  // ※readOnly のノード（＝選択モードでフォーカスが残っている状態）はここで弾かない。
+  const activeEl = document.activeElement;
+  if (activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT') && !activeEl.readOnly) {
     return;
   }
 
   const isArrowKey = e.key === 'ArrowUp' || e.key === 'ArrowDown'
       || e.key === 'ArrowLeft' || e.key === 'ArrowRight';
 
+  // フォーカス中のノードに依存しないグローバルショートカット。
+  // 選択モードなら、フォーカスを見失っていても Undo/Redo は実行できるようにする。
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+    e.preventDefault();
+    undo();
+    return;
+  }
+  if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z') ||
+      ((e.ctrlKey || e.metaKey) && e.key === 'y')) {
+    e.preventDefault();
+    redo();
+    return;
+  }
+
   const focusedNode = findNode(treeData, focusedNodeId);
   if (!focusedNode) {
-    // フォーカスが失われている時でも矢印キーによる画面スクロールを抑止し、
-    // ツリーにノードがあれば先頭にフォーカスを復帰させる
-    if (isArrowKey) {
+    // フォーカスが失われている時でも、矢印キー・Enter・Space・F2 は
+    // 画面スクロールを抑止し、ツリーの先頭ノードにフォーカスを復帰させる。
+    if (isArrowKey || e.key === 'Enter' || e.key === ' ' || e.key === 'F2') {
       e.preventDefault();
       if (treeData.children.length > 0) {
         focusedNodeId = treeData.children[0].id;
@@ -2165,24 +2182,14 @@ document.addEventListener('keydown', (e) => {
     }
   }
 
-  // Ctrl/Cmd + Z: Undo
-  else if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-    e.preventDefault();
-    undo();
-  }
-
-  // Ctrl/Cmd + Shift + Z または Ctrl/Cmd + Y: Redo
-  else if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z') ||
-           ((e.ctrlKey || e.metaKey) && e.key === 'y')) {
-    e.preventDefault();
-    redo();
-  }
+  // Undo/Redo（Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y）はハンドラ冒頭で処理済み
 
   // スペースまたはF2: 編集モードに入る
   else if (e.key === ' ' || e.key === 'F2') {
     e.preventDefault();
     const input = document.querySelector(`[data-node-id="${focusedNodeId}"] .node-input`);
     if (input) {
+      input.readOnly = false; // 編集モードに切り替える（Enter分岐と揃える）
       input.focus();
       input.setSelectionRange(input.value.length, input.value.length);
     }

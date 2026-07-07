@@ -164,4 +164,43 @@ test.describe('Node CRUD Operations', () => {
     // これは仕様通り
     expect(typeof hasUnsaved).toBe('boolean');
   });
+
+  test('should enter edit mode with Space key', async () => {
+    await typeIntoNode(window, 'Alpha');
+    await window.keyboard.press('Escape');
+    await window.waitForTimeout(200);
+
+    // 選択モードで Space → 編集モード（readOnly=false）に入るはず
+    await window.keyboard.press('Space');
+    await window.waitForTimeout(200);
+
+    const state = await window.evaluate(() => {
+      const el = document.querySelector(`[data-node-id="${focusedNodeId}"] .node-input`);
+      return { readOnly: el.readOnly, isActive: document.activeElement === el };
+    });
+    expect(state.readOnly).toBe(false);
+    expect(state.isActive).toBe(true);
+
+    // 実際に編集できること（末尾に追記される）を確認
+    await window.keyboard.type('X');
+    await window.waitForTimeout(200);
+    const data = await getTreeData(window);
+    expect(data.children[0].text).toBe('AlphaX');
+  });
+
+  test('should enter edit mode with F2 key', async () => {
+    await typeIntoNode(window, 'Beta');
+    await window.keyboard.press('Escape');
+    await window.waitForTimeout(200);
+
+    await window.keyboard.press('F2');
+    await window.waitForTimeout(200);
+
+    const state = await window.evaluate(() => {
+      const el = document.querySelector(`[data-node-id="${focusedNodeId}"] .node-input`);
+      return { readOnly: el.readOnly, isActive: document.activeElement === el };
+    });
+    expect(state.readOnly).toBe(false);
+    expect(state.isActive).toBe(true);
+  });
 });

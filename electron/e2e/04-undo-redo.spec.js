@@ -125,4 +125,62 @@ test.describe('Undo/Redo', () => {
     data = await getTreeData(window);
     expect(data.children[0].children).toHaveLength(0);
   });
+
+  // 回帰テスト: フォーカスを見失った選択モードでも Ctrl+Z が効くこと
+  test('should undo via Ctrl+Z even when node focus is lost', async () => {
+    await window.evaluate(() => {
+      saveHistory();
+      treeData.children.push(createNode('Extra'));
+      renderTree();
+      saveHistory();
+    });
+    await window.waitForTimeout(200);
+
+    let data = await getTreeData(window);
+    expect(data.children).toHaveLength(2);
+
+    // フォーカス喪失状態を再現（focusedNodeId 無効 + body フォーカス）
+    await window.evaluate(() => {
+      focusedNodeId = null;
+      if (document.activeElement && document.activeElement.blur) {
+        document.activeElement.blur();
+      }
+      document.body.focus();
+    });
+    await window.waitForTimeout(100);
+
+    await pressKeys(window, 'Control+z');
+    await window.waitForTimeout(300);
+
+    data = await getTreeData(window);
+    expect(data.children).toHaveLength(1);
+  });
+
+  // 回帰テスト: readOnly のノード入力欄にフォーカスが残っていても Ctrl+Z が効くこと
+  test('should undo via Ctrl+Z when a read-only node input holds focus', async () => {
+    await window.evaluate(() => {
+      saveHistory();
+      treeData.children.push(createNode('Extra2'));
+      renderTree();
+      saveHistory();
+    });
+    await window.waitForTimeout(200);
+
+    let data = await getTreeData(window);
+    expect(data.children).toHaveLength(2);
+
+    // 選択モードのまま（readOnly=true）ノード入力欄にフォーカスを残す
+    await window.evaluate(() => {
+      const el = document.querySelector('.node-input');
+      el.readOnly = true;
+      el.focus();
+    });
+    await window.waitForTimeout(100);
+
+    await pressKeys(window, 'Control+z');
+    await window.waitForTimeout(300);
+
+    data = await getTreeData(window);
+    expect(data.children).toHaveLength(1);
+  });
 });
