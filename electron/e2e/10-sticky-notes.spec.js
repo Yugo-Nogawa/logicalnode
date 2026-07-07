@@ -135,4 +135,31 @@ test.describe('Sticky Notes', () => {
     expect(saveData.stickyNotes).toHaveLength(1);
     expect(saveData.stickyNotes[0].text).toBe('Save this note');
   });
+
+  test('should flag unsaved changes when only a sticky note is added', async () => {
+    // 保存済みの基準スナップショットをファイル読み込みで設定
+    await window.evaluate(() => {
+      loadFile(JSON.stringify({
+        version: 1,
+        treeData: { id: 'root', text: '', children: [
+          { id: 'node-1', text: 'A', bold: false, color: null, collapsed: false, memo: '', children: [] }
+        ] },
+        stickyNotes: [],
+        nodeLinks: []
+      }));
+    });
+    await window.waitForTimeout(300);
+
+    // 読み込み直後は未保存ではない
+    let dirty = await window.evaluate(() => window.hasUnsavedChanges);
+    expect(dirty).toBe(false);
+
+    // 付箋だけを追加（ツリーは変更していない）
+    await window.evaluate(() => addStickyNote(200, 200));
+    await window.waitForTimeout(200);
+
+    // 付箋の変更でも未保存フラグが立つこと
+    dirty = await window.evaluate(() => window.hasUnsavedChanges);
+    expect(dirty).toBe(true);
+  });
 });

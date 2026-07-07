@@ -27,9 +27,14 @@ const MAX_HISTORY = 100;
 let clipboard = null;
 let isCut = false;
 
+// 付箋の状態（描画ロジックは後半だが、状態はここで宣言し未保存判定から安全に参照する）
+let stickyNotes = [];
+let stickyNoteIdCounter = 1;
+
 // 未保存の変更を追跡
 window.hasUnsavedChanges = false;
-let savedTreeData = null;
+// 保存済みドキュメント全体（ツリー＋付箋＋リンク）の正規化スナップショット
+let savedDocumentSnapshot = null;
 
 // 拡大縮小の基準サイズ
 const DEFAULT_FONT_SIZE = 16;
@@ -58,14 +63,22 @@ function saveHistory() {
   checkUnsavedChanges();
 }
 
+// 未保存判定用: ドキュメント全体（ツリー＋付箋＋リンク）の正規化スナップショット
+function documentSnapshot() {
+  return JSON.stringify({
+    treeData: treeData,
+    stickyNotes: stickyNotes,
+    nodeLinks: nodeLinks
+  });
+}
+
 // 未保存の変更をチェック
 function checkUnsavedChanges() {
-  if (savedTreeData === null) {
+  if (savedDocumentSnapshot === null) {
     window.hasUnsavedChanges = false;
   } else {
-    const currentData = JSON.stringify(treeData);
-    const savedData = JSON.stringify(savedTreeData);
-    window.hasUnsavedChanges = currentData !== savedData;
+    // ツリーだけでなく付箋・ノード間リンクの変更も検知する
+    window.hasUnsavedChanges = documentSnapshot() !== savedDocumentSnapshot;
   }
   // ウィンドウタイトルを更新
   ipcRenderer.invoke('update-window-title', window.hasUnsavedChanges);
@@ -1534,7 +1547,7 @@ async function saveFile() {
 
   if (result.success) {
     // 保存済みデータを更新
-    savedTreeData = JSON.parse(JSON.stringify(treeData));
+    savedDocumentSnapshot = documentSnapshot();
     window.hasUnsavedChanges = false;
     ipcRenderer.invoke('update-window-title', false);
   } else if (!result.canceled) {
@@ -1548,7 +1561,7 @@ async function saveFileAs() {
   const result = await ipcRenderer.invoke('save-file-as', serializeDocument());
 
   if (result.success) {
-    savedTreeData = JSON.parse(JSON.stringify(treeData));
+    savedDocumentSnapshot = documentSnapshot();
     window.hasUnsavedChanges = false;
     ipcRenderer.invoke('update-window-title', false);
   } else if (!result.canceled) {
@@ -1647,7 +1660,7 @@ function loadFile(data) {
   linkIdCounter = maxLinkId + 1;
 
   // 読み込んだデータを保存済みとしてマーク
-  savedTreeData = JSON.parse(JSON.stringify(treeData));
+  savedDocumentSnapshot = documentSnapshot();
   window.hasUnsavedChanges = false;
   ipcRenderer.invoke('update-window-title', false);
 
@@ -1664,7 +1677,7 @@ function newFile() {
   };
   nodeIdCounter = 1;
   focusedNodeId = null;
-  savedTreeData = null;
+  savedDocumentSnapshot = null;
   window.hasUnsavedChanges = false;
 
   // 付箋もクリア
@@ -2791,7 +2804,7 @@ renderTree(true);
 saveHistory();
 
 // 初期状態を保存済みとしてマーク（新規ファイルなので未保存フラグはfalse）
-savedTreeData = null;
+savedDocumentSnapshot = null;
 window.hasUnsavedChanges = false;
 
 // 初期ツールバー状態を更新
@@ -3114,8 +3127,7 @@ document.addEventListener('drop', async (e) => {
 // 付箋機能
 // =========================================
 
-let stickyNotes = [];
-let stickyNoteIdCounter = 1;
+// stickyNotes / stickyNoteIdCounter はファイル先頭で宣言済み（未保存判定のTDZ回避のため）
 
 // 付箋のデータ構造
 function createStickyNote(x = 100, y = 100) {
