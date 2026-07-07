@@ -203,4 +203,25 @@ test.describe('Node CRUD Operations', () => {
     expect(state.readOnly).toBe(false);
     expect(state.isActive).toBe(true);
   });
+
+  test('should not create a sibling on Enter while IME is composing', async () => {
+    const input = await getFocusedNodeInput(window);
+    await input.dblclick();
+    await window.waitForTimeout(100);
+    await input.fill('あ');
+
+    // 日本語変換確定のEnter（isComposing=true）をシミュレート
+    await window.evaluate(() => {
+      const el = document.querySelector(`[data-node-id="${focusedNodeId}"] .node-input`);
+      const ev = new KeyboardEvent('keydown', {
+        key: 'Enter', isComposing: true, keyCode: 229, bubbles: true, cancelable: true
+      });
+      el.dispatchEvent(ev);
+    });
+    await window.waitForTimeout(300);
+
+    // 兄弟ノードは増えていないはず
+    const data = await getTreeData(window);
+    expect(data.children).toHaveLength(1);
+  });
 });

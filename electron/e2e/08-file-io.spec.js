@@ -195,4 +195,37 @@ test.describe('File Save/Load', () => {
     expect(data.children).toHaveLength(1);
     expect(data.children[0].text).toBe('');
   });
+
+  test('should embed a schema version in saved data', async () => {
+    const version = await window.evaluate(() => JSON.parse(serializeDocument()).version);
+    expect(version).toBe(1);
+  });
+
+  test('should reject a corrupted file without clobbering current data', async () => {
+    // 既存データを用意
+    await typeIntoNode(window, 'Keep me');
+    await window.keyboard.press('Escape');
+    await window.waitForTimeout(150);
+    let before = await getTreeData(window);
+    expect(before.children[0].text).toBe('Keep me');
+
+    // show-error-dialog を握りつぶし、ネイティブダイアログでハングしないようにする
+    const errored = await window.evaluate(() => {
+      return new Promise((resolve) => {
+        const orig = ipcRenderer.invoke.bind(ipcRenderer);
+        let called = false;
+        ipcRenderer.invoke = (ch, ...args) => {
+          if (ch === 'show-error-dialog') { called = true; return Promise.resolve(); }
+          return orig(ch, ...args);
+        };
+        loadFile('{ this is not valid json');
+        setTimeout(() => { ipcRenderer.invoke = orig; resolve(called); }, 80);
+      });
+    });
+    expect(errored).toBe(true);
+
+    // 破損ファイルで現在のデータが壊れていないこと
+    const after = await getTreeData(window);
+    expect(after.children[0].text).toBe('Keep me');
+  });
 });

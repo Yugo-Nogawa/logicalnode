@@ -1282,6 +1282,8 @@ function renderNode(node) {
   });
 
   memoTextarea.addEventListener('keydown', (e) => {
+    // IME変換確定のEnterで編集終了しないようガード（§4.3）
+    if (e.isComposing || e.keyCode === 229) return;
     // Enterで編集を終了（Shift+Enterは改行）
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -1411,6 +1413,10 @@ function updateBreadcrumb() {
 
 // キーボード操作の処理（編集モード内）
 function handleKeyPress(e, node) {
+  // IME変換中（日本語入力の確定など）は自前のキー処理をしない。
+  // 変換確定の Enter を「兄弟ノード追加」と誤認させないため（§4.3 / §1.4）。
+  if (e.isComposing || e.keyCode === 229) return;
+
   // Enter: 兄弟ノードを追加（Shift+Enterで上に、Enterで下に）
   if (e.key === 'Enter') {
     // キーリピートを無視
@@ -1509,18 +1515,24 @@ function handleKeyPress(e, node) {
   }
 }
 
-// ファイル保存（上書き保存）
+// 保存データのスキーマバージョン（将来の移行のために埋め込む・§13）
+const APP_DATA_VERSION = 1;
+
+// 現在のドキュメントを保存用文字列にシリアライズ
+function serializeDocument() {
+  return JSON.stringify({
+    version: APP_DATA_VERSION,
+    treeData: treeData,
+    stickyNotes: stickyNotes,
+    nodeLinks: nodeLinks
+  }, null, 2);
+}
+
+// ファイル保存（上書き保存）。結果オブジェクト {success, canceled?, error?} を返す。
 async function saveFile() {
-  const dataToSave = {
-    treeData: treeData,
-    stickyNotes: stickyNotes,
-    nodeLinks: nodeLinks
-  };
-  const data = JSON.stringify(dataToSave, null, 2);
-  const result = await ipcRenderer.invoke('save-file', data);
+  const result = await ipcRenderer.invoke('save-file', serializeDocument());
 
   if (result.success) {
-    console.log('File saved successfully');
     // 保存済みデータを更新
     savedTreeData = JSON.parse(JSON.stringify(treeData));
     window.hasUnsavedChanges = false;
@@ -1528,91 +1540,119 @@ async function saveFile() {
   } else if (!result.canceled) {
     console.error('Failed to save file:', result.error);
   }
+  return result;
 }
 
-// ファイル別名保存
+// ファイル別名保存。結果オブジェクトを返す。
 async function saveFileAs() {
-  const dataToSave = {
-    treeData: treeData,
-    stickyNotes: stickyNotes,
-    nodeLinks: nodeLinks
-  };
-  const data = JSON.stringify(dataToSave, null, 2);
-  const result = await ipcRenderer.invoke('save-file-as', data);
+  const result = await ipcRenderer.invoke('save-file-as', serializeDocument());
 
   if (result.success) {
-    console.log('File saved as successfully');
-    // 保存済みデータを更新
     savedTreeData = JSON.parse(JSON.stringify(treeData));
     window.hasUnsavedChanges = false;
     ipcRenderer.invoke('update-window-title', false);
   } else if (!result.canceled) {
     console.error('Failed to save file:', result.error);
   }
+  return result;
 }
+
+// メインプロセス（閉じる/開く時の確認）から保存を呼べるように公開
+window.saveCurrentFile = saveFile;
 
 // ファイル読み込み
 function loadFile(data) {
+  // 1) パース（破損ファイルはアプリを落とさず明示エラー・§13）
+  let parsed;
   try {
-    const parsed = JSON.parse(data);
+    parsed = JSON.parse(data);
+  } catch (err) {
+    ipcRenderer.invoke('show-error-dialog', {
+      title: 'ファイルを読み込めませんでした',
+      message: 'ファイルが破損しているか、正しい形式ではありません。\n\n' + err.message
+    });
+    return;
+  }
 
-    // 新形式（treeDataとstickyNotesを含む）か旧形式（treeDataのみ）かを判定
-    if (parsed.treeData && parsed.stickyNotes !== undefined) {
-      // 新形式
-      treeData = parsed.treeData;
-      stickyNotes = parsed.stickyNotes || [];
-      nodeLinks = parsed.nodeLinks || [];
-    } else {
-      // 旧形式（後方互換性）
-      treeData = parsed;
-      stickyNotes = [];
-      nodeLinks = [];
+  // 2) 形式判定（新形式: {version?, treeData, stickyNotes, ...} / 旧形式: treeData そのもの）
+  let nextTree, nextSticky, nextLinks;
+  if (parsed && parsed.treeData && parsed.stickyNotes !== undefined) {
+    // 新しいバージョンで保存されたファイルは警告（前方互換の明示・§13）
+    if (typeof parsed.version === 'number' && parsed.version > APP_DATA_VERSION) {
+      ipcRenderer.invoke('show-error-dialog', {
+        title: '新しいバージョンのファイル',
+        message: `このファイルは新しいバージョン (v${parsed.version}) で保存されています。\n一部の内容が正しく表示されない場合があります。`
+      });
     }
+    nextTree = parsed.treeData;
+    nextSticky = parsed.stickyNotes || [];
+    nextLinks = parsed.nodeLinks || [];
+  } else {
+    // 旧形式（後方互換性）
+    nextTree = parsed;
+    nextSticky = [];
+    nextLinks = [];
+  }
 
-    focusedNodeId = treeData.children.length > 0 ? treeData.children[0].id : null;
+  // 3) 構造の妥当性チェック（children 配列を持つツリーであること）
+  if (!nextTree || typeof nextTree !== 'object' || !Array.isArray(nextTree.children)) {
+    ipcRenderer.invoke('show-error-dialog', {
+      title: 'ファイルを読み込めませんでした',
+      message: 'ロジックツリーのデータが見つかりませんでした。'
+    });
+    return;
+  }
 
-    // ノードIDカウンターを更新
-    let maxId = 0;
-    function updateCounter(node) {
+  // 4) 適用（ここまで来たら安全に反映）
+  treeData = nextTree;
+  stickyNotes = Array.isArray(nextSticky) ? nextSticky : [];
+  nodeLinks = Array.isArray(nextLinks) ? nextLinks : [];
+
+  focusedNodeId = treeData.children.length > 0 ? treeData.children[0].id : null;
+
+  // ノードIDカウンターを更新
+  let maxId = 0;
+  function updateCounter(node) {
+    if (node && typeof node.id === 'string') {
       const match = node.id.match(/node-(\d+)/);
       if (match) {
         maxId = Math.max(maxId, parseInt(match[1]));
       }
+    }
+    if (node && Array.isArray(node.children)) {
       node.children.forEach(updateCounter);
     }
-    treeData.children.forEach(updateCounter);
-    nodeIdCounter = maxId + 1;
-
-    // 付箋IDカウンターを更新
-    let maxStickyId = 0;
-    stickyNotes.forEach(note => {
-      const match = note.id.match(/sticky-(\d+)/);
-      if (match) {
-        maxStickyId = Math.max(maxStickyId, parseInt(match[1]));
-      }
-    });
-    stickyNoteIdCounter = maxStickyId + 1;
-
-    // リンクIDカウンターを更新
-    let maxLinkId = 0;
-    nodeLinks.forEach(link => {
-      const match = link.id.match(/link-(\d+)/);
-      if (match) {
-        maxLinkId = Math.max(maxLinkId, parseInt(match[1]));
-      }
-    });
-    linkIdCounter = maxLinkId + 1;
-
-    // 読み込んだデータを保存済みとしてマーク
-    savedTreeData = JSON.parse(JSON.stringify(treeData));
-    window.hasUnsavedChanges = false;
-    ipcRenderer.invoke('update-window-title', false);
-
-    renderTree();
-    renderAllStickyNotes();
-  } catch (err) {
-    console.error('Failed to parse file:', err);
   }
+  treeData.children.forEach(updateCounter);
+  nodeIdCounter = maxId + 1;
+
+  // 付箋IDカウンターを更新
+  let maxStickyId = 0;
+  stickyNotes.forEach(note => {
+    const match = note.id && note.id.match(/sticky-(\d+)/);
+    if (match) {
+      maxStickyId = Math.max(maxStickyId, parseInt(match[1]));
+    }
+  });
+  stickyNoteIdCounter = maxStickyId + 1;
+
+  // リンクIDカウンターを更新
+  let maxLinkId = 0;
+  nodeLinks.forEach(link => {
+    const match = link.id && link.id.match(/link-(\d+)/);
+    if (match) {
+      maxLinkId = Math.max(maxLinkId, parseInt(match[1]));
+    }
+  });
+  linkIdCounter = maxLinkId + 1;
+
+  // 読み込んだデータを保存済みとしてマーク
+  savedTreeData = JSON.parse(JSON.stringify(treeData));
+  window.hasUnsavedChanges = false;
+  ipcRenderer.invoke('update-window-title', false);
+
+  renderTree();
+  renderAllStickyNotes();
 }
 
 // 新規ファイル
@@ -2904,6 +2944,8 @@ document.getElementById('search-input').addEventListener('input', (e) => {
 });
 
 document.getElementById('search-input').addEventListener('keydown', (e) => {
+  // IME変換確定のEnterを「次を検索」と誤認しない（§4.3）
+  if (e.isComposing || e.keyCode === 229) return;
   if (e.key === 'Enter') {
     e.preventDefault();
     if (e.shiftKey) {
